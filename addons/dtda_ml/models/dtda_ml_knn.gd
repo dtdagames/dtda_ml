@@ -25,7 +25,10 @@ func _get_neighbors(test_row):
 		i += 1
 	distances.sort_custom(func(a, b): return a[1] < b[1])
 	var neighbors = []
-	for u in num_neighbors:
+	var tempNeighbors = num_neighbors
+	if num_neighbors > X.size():
+		tempNeighbors = X.size()
+	for u in tempNeighbors:
 		neighbors.push_back(distances[u][0])
 	return neighbors
 
