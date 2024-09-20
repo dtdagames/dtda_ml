@@ -1,5 +1,5 @@
 # dtda_ml
-DTDA ML allows you to run machine learning models like linear regression, logistic regression, KNN and SVM
+DTDA ML allows you to run machine learning models like KNN, Linear Regression, Logistic Regression, SVM
 
 
 3 models are currently available:
@@ -9,7 +9,7 @@ DTDA ML allows you to run machine learning models like linear regression, logist
 
 === KNN Model ===
 
-Use DTDAKNN.new() to create a new model. _fit and _predict allows you to train and use the model. This model is better for classification.
+Use DTDAKNN.new() to create a new model. _fit() and _predict() allows you to train and use the model. This model is better for classification.
 
 Example:
 - var knn = DTDAKNN.new(3)
@@ -18,7 +18,7 @@ Example:
 
 === Linear Regression Model ===
 
-Use DTDALinReg.new() to create a new model. _fit and _predict allows you to train and use the model. This model is better for Regression.
+Use DTDALinReg.new() to create a new model. _fit() and _predict() allows you to train and use the model. This model is better for Regression.
 
 Example:
 - var linreg = DTDALinReg.new(0.01, 1000)
@@ -27,7 +27,7 @@ Example:
 
 === Linear Regression Model ===
 
-Use DTDALogReg.new() to create a new model. _fit and _predict allows you to train and use the model. This model is only for classification (-1 or 1).
+Use DTDALogReg.new() to create a new model. _fit() and _predict() allows you to train and use the model. This model is only for classification (-1 or 1).
 
 Example:
 - var logreg = DTDALogReg.new(0.01, 1000)
