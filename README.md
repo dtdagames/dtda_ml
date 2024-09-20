@@ -25,9 +25,9 @@ Example:
 - linreg._fit(X_train, Y_train)
 - print("Linear Regression prediction: ", linreg._predict(X_test))
 
-=== Linear Regression Model ===
+=== Logistic Regression Model ===
 
-Use DTDALogReg.new() to create a new model. _fit() and _predict() allows you to train and use the model. This model is only for classification (-1 or 1).
+Use DTDALogReg.new() to create a new model. _fit() and _predict() allows you to train and use the model. This model is only for classification (1 or 0).
 
 Example:
 - var logreg = DTDALogReg.new(0.01, 1000)
