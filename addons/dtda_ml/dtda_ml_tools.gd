@@ -33,7 +33,6 @@ func _normalize_negative(tempData):
 			row = -1
 		newData.push_back(row)
 	return newData
-
 # convert >0.5 to 1 from array
 func _normalize_int(tempData):
 	var newData = []
@@ -44,6 +43,16 @@ func _normalize_int(tempData):
 			row = 0
 		newData.push_back(row)
 	return newData
+# convert value to -1/1 from array
+func _sign_array(x):
+	var matrix = []
+	for row in x:
+		if row>0:
+			row = 1
+		elif row<0:
+			row = -1
+		matrix.push_back(row)
+	return matrix
 
 # return array with specific column
 func _getVariable(tempData, tempColumnId):
@@ -74,6 +83,12 @@ func _substract_arrays(x1, x2):
 	var matrix = []
 	for i in x1.size():
 		matrix.push_back(x1[i] - x2[i])
+	return matrix
+# return substract of array and const
+func _sub_arrays_const(x1, b):
+	var matrix = []
+	for i in x1.size():
+		matrix.push_back(x1[i] - b)
 	return matrix
 
 # add array by constant
@@ -118,6 +133,14 @@ func _dot_product(x1, x2):
 		for u in x1[0].size():
 			res += x1[i][u] * x2[u]
 		matrix.push_back(res)
+	return matrix
+# return dor product of array and const
+func _dot_product_simple(x1, x2):
+	var matrix = []
+	var res = 0
+	for i in x1.size():
+		res += x1[i] * x2[i]
+	matrix.push_back(res)
 	return matrix
 
 # transpose array
