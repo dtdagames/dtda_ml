@@ -7,6 +7,7 @@ func _get_perf(y_pred, y_test, type):
 		y_pred = _normalize_int(y_pred)
 	# convert 0 to -1 from test for SVM
 	if type == 3:
+		y_pred = _normalize_negative(y_pred)
 		y_test = _normalize_negative(y_test)
 	
 	var correctly_classified = 0
@@ -16,7 +17,7 @@ func _get_perf(y_pred, y_test, type):
 			correctly_classified += 1
 		count += 1
 	
-	return float(correctly_classified) / float(count) *100
+	return snapped(float(correctly_classified) / float(count) *100, 0.01)
 
 # convert array from float to int
 func array_to_int(arr):
