@@ -43,6 +43,9 @@ func _ready():
 	_linreg_example()
 	_logreg_example()
 	_svm_example()
+	_scaler_example()
+	_metrics_example()
+	_persistence_example()
 
 func _knn_example():
 	var X_train = mltools._dropVariable(dataKNN, dataKNN[0].size()-1)
@@ -113,3 +116,71 @@ func _svm_example():
 	svm._fit(X_train, Y_train)
 	print("SVM predictions: ", svm._predict(X_test))
 	print("SVM score: ", mltools._get_perf(svm._predict(X_test), y_test, 3), "%")
+
+# the models scale their features on their own, use DTDAScaler for your own data
+func _scaler_example():
+	var raw = [
+		[1.6, 40000],
+		[5.4, 80000],
+		[10.2, 121000],
+	]
+
+	var standard = DTDAScaler.new()
+	print("Standardized: ", standard._fit_transform(raw))
+
+	var minmax = DTDAScaler.new(DTDAScaler.MINMAX)
+	var scaled = minmax._fit_transform(raw)
+	print("Min-max: ", scaled)
+	print("Back to the original unit: ", minmax._inverse_transform(scaled))
+
+func _metrics_example():
+	# classification, on the logistic regression data
+	var X_train = mltools._dropVariable(dataLogR, dataLogR[0].size()-1)
+	var Y_train = mltools._getVariable(dataLogR, dataLogR[0].size()-1)
+	var X_test = [
+		[1, 3, 1, 0, 1, 0],
+		[2, 2, 4, 1, 1, 1],
+		[4, 1, 1, 0, 1, 0],
+	]
+	var y_test = [0, 1, 1]
+
+	var logreg = DTDALogReg.new(0.01, 1000)
+	logreg._fit(X_train, Y_train)
+	var y_pred = logreg._predict(X_test)
+	print("Accuracy: ", mltools._accuracy(y_pred, y_test), "%")
+	print("Confusion matrix: ", mltools._confusion_matrix(y_pred, y_test))
+	print("Precision: ", mltools._precision(y_pred, y_test))
+	print("Recall: ", mltools._recall(y_pred, y_test))
+	print("F1 score: ", mltools._f1_score(y_pred, y_test))
+
+	# regression, scored on the training set itself
+	var X_lin = mltools._dropVariable(dataLinR, dataLinR[0].size()-1)
+	var y_lin = mltools._getVariable(dataLinR, dataLinR[0].size()-1)
+	var linreg = DTDALinReg.new(0.01, 1000)
+	linreg._fit(X_lin, y_lin)
+	var lin_pred = linreg._predict(X_lin)
+	print("R2: ", mltools._r2_score(lin_pred, y_lin))
+	print("RMSE: ", mltools._rmse(lin_pred, y_lin))
+	print("MAE: ", mltools._mae(lin_pred, y_lin))
+
+# train once, ship the weights, predict without the training set
+func _persistence_example():
+	var path = "user://dtda_linreg.json"
+	var X_train = mltools._dropVariable(dataLinR, dataLinR[0].size()-1)
+	var y_train = mltools._getVariable(dataLinR, dataLinR[0].size()-1)
+	var X_test = [
+		[7.2],
+		[9.0],
+		[11.1],
+	]
+
+	var linreg = DTDALinReg.new(0.01, 1000)
+	linreg._fit(X_train, y_train)
+	print("Before saving: ", linreg._predict(X_test))
+	if not linreg._save(path):
+		return
+
+	# a brand new model, never fitted
+	var loaded = DTDALinReg.new(0.01, 1000)
+	if loaded._load(path):
+		print("After loading: ", loaded._predict(X_test))

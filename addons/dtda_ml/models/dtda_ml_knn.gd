@@ -63,4 +63,26 @@ func _predict(newX):
 		pred.push_back(_majority_vote(output_values))
 	return pred
 
+func _to_dict():
+	if not _check_fitted("DTDAKNN", X, "_save()"):
+		return {}
+	return {
+		"model": "DTDAKNN",
+		"version": 1,
+		"num_neighbors": num_neighbors,
+		"X": X,
+		"Y": Y,
+	}
+
+func _from_dict(data):
+	if not _check_model_name(data, "DTDAKNN"):
+		return false
+	num_neighbors = data.get("num_neighbors", num_neighbors)
+	X = data.get("X")
+	Y = data.get("Y")
+	if X == null or Y == null:
+		push_error("DTDAKNN: the saved model has no training set")
+		return false
+	return true
+
 # === End KNN model === #

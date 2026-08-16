@@ -10,6 +10,7 @@ var lambda
 var iter
 var W
 var b
+var scaler
 
 func _init(learning_rate=0.01, lambda_param=0.01, n_iters=1000):
 	lr = learning_rate
@@ -21,8 +22,8 @@ func _fit(newX, newY):
 	n = newX[0].size()
 
 	# standardized features, the descent is unstable otherwise
-	_fit_feature_scaling(newX)
-	var X = _scale_features(newX)
+	scaler = DTDAScaler.new()
+	var X = scaler._fit_transform(newX)
 	var y2 = _normalize_negative(newY)
 
 	# list zeros
@@ -53,8 +54,37 @@ func _fit(newX, newY):
 func _predict(newX):
 	if not _check_fitted("DTDASVM", W):
 		return []
-	var dotXW = _dot_product(_scale_features(newX), W)
+	var dotXW = _dot_product(scaler._transform(newX), W)
 	var predY = _sub_arrays_const(dotXW, b)
 	return _sign_array(predY)
+
+func _to_dict():
+	if not _check_fitted("DTDASVM", W, "_save()"):
+		return {}
+	return {
+		"model": "DTDASVM",
+		"version": 1,
+		"lr": lr,
+		"lambda": lambda,
+		"iter": iter,
+		"W": W,
+		"b": b,
+		"scaler": scaler._to_dict(),
+	}
+
+func _from_dict(data):
+	if not _check_model_name(data, "DTDASVM"):
+		return false
+	lr = data.get("lr", lr)
+	lambda = data.get("lambda", lambda)
+	iter = data.get("iter", iter)
+	W = data.get("W")
+	b = data.get("b", 0)
+	if W == null:
+		push_error("DTDASVM: the saved model has no weights")
+		return false
+	n = W.size()
+	scaler = DTDAScaler.new()
+	return scaler._from_dict(data.get("scaler", {}))
 
 # === End SVM model === #
