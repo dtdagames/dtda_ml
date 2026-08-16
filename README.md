@@ -2,11 +2,12 @@
 DTDA ML allows you to run machine learning models like KNN, Linear Regression, Logistic Regression, SVM
 
 
-4 models are currently available:
+5 models are currently available:
 - KNN
 - Linear Regression
 - Logistic Regression
 - SVM
+- Decision Tree
 
 All of them can be scored with the usual metrics, and saved to a JSON file to be reloaded later.
 
@@ -141,3 +142,25 @@ Example:
     [1, 1, 0, 1]
   ]
 - print("SVM prediction: ", svm._predict(X_test))
+
+=== Decision Tree Model ===
+
+Use DTDATree.new() to create a new model. _fit() and _predict() allows you to train and use the model. It is the only model here handling a non linear frontier: it separates a XOR, which the linear models cannot.
+
+DTDATree.new(max_depth, min_samples_split, mode) takes:
+- max_depth : how deep the tree may grow, 5 by default. The main guard against overfitting
+- min_samples_split : a node holding fewer rows than this becomes a leaf, 2 by default
+- mode : DTDATree.CLASSIFIER (the default) splits on the Gini impurity and a leaf answers the majority label, DTDATree.REGRESSOR splits on the variance and a leaf answers the mean
+
+A tree compares each feature to a threshold, so the scale of your data does not matter: unlike the other models it does no scaling at all, and none is needed.
+Being made of thresholds, it also answers a constant outside the range it was trained on, where a linear regression keeps extrapolating.
+
+Example:
+- var tree = DTDATree.new(3, 2, DTDATree.CLASSIFIER)
+- tree._fit(X_train, y_train)
+- var X_test = [
+    [1, 1, 0, 1]
+  ]
+- print("Tree prediction: ", tree._predict(X_test))
+- var regressor = DTDATree.new(3, 2, DTDATree.REGRESSOR) #same model, on a continuous target
+- regressor._fit(X_train, y_train)
