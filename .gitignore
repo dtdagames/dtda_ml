@@ -1,0 +1,10 @@
+# Godot generates these on first import, they are machine specific
+.godot/
+.import/
+export.cfg
+export_presets.cfg
+
+# Mono / C#
+.mono/
+data_*/
+mono_crash.*.json
