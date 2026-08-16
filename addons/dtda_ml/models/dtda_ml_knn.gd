@@ -12,7 +12,7 @@ func _init(n:int):
 
 func _euclidean_distance(row1, row2):
 	var distance = 0.0
-	for i in row1.size()-1:
+	for i in row1.size():
 		distance += (row1[i] - row2[i])**2
 	return sqrt(distance)
 
@@ -36,6 +36,21 @@ func _fit(newX, newY):
 	X = newX
 	Y = newY
 
+# most frequent label among the neighbors, ties go to the closest one
+func _majority_vote(output_values):
+	var counts = {}
+	for value in output_values:
+		counts[value] = counts.get(value, 0) + 1
+	var tempPred = output_values[0]
+	var best_count = 0
+	# output_values is ordered from the closest to the farthest neighbor,
+	# so a strict comparison keeps the closest label on equality
+	for value in output_values:
+		if counts[value] > best_count:
+			tempPred = value
+			best_count = counts[value]
+	return tempPred
+
 func _predict(newX):
 	var pred = []
 	for i in newX.size():
@@ -43,8 +58,7 @@ func _predict(newX):
 		var output_values = []
 		for rowId in neighbors:
 			output_values.push_back(Y[rowId])
-		var tempPred = output_values[0]
-		pred.push_back(tempPred)
+		pred.push_back(_majority_vote(output_values))
 	return pred
 
 # === End KNN model === #

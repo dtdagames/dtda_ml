@@ -165,3 +165,22 @@ func _sum_array(x):
 	for i in x.size():
 		total += x[i]
 	return total
+
+# return mean of all rows
+func _mean_array(x):
+	if x.size() == 0:
+		return 0.0
+	return float(_sum_array(x)) / float(x.size())
+
+# return standard deviation of all rows, 1.0 when constant so it stays safe to divide by
+func _std_array(x):
+	if x.size() == 0:
+		return 1.0
+	var mean = _mean_array(x)
+	var total = 0.0
+	for i in x.size():
+		total += (x[i] - mean)**2
+	var deviation = sqrt(total / float(x.size()))
+	if deviation == 0.0:
+		return 1.0
+	return deviation
