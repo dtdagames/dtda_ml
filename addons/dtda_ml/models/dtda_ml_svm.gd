@@ -16,18 +16,21 @@ func _init(learning_rate=0.01, lambda_param=0.01, n_iters=1000):
 	lambda = lambda_param
 	iter = n_iters
 
-func _fit(X, Y):
-	m = X.size()
-	n = X[0].size()
-	
-	var y2 = _normalize_negative(Y)
-	
+func _fit(newX, newY):
+	m = newX.size()
+	n = newX[0].size()
+
+	# standardized features, the descent is unstable otherwise
+	_fit_feature_scaling(newX)
+	var X = _scale_features(newX)
+	var y2 = _normalize_negative(newY)
+
 	# list zeros
 	W = []
 	for i in n:
 		W.push_back(0)
 	b = 0
-	
+
 	# gradient
 	for a in range(iter):
 		for i in X.size():
@@ -48,7 +51,9 @@ func _fit(X, Y):
 				b = b - (lr*y2[i])
 
 func _predict(newX):
-	var dotXW = _dot_product(newX, W)
+	if not _check_fitted("DTDASVM", W):
+		return []
+	var dotXW = _dot_product(_scale_features(newX), W)
 	var predY = _sub_arrays_const(dotXW, b)
 	return _sign_array(predY)
 

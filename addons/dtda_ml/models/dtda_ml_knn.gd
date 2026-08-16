@@ -52,6 +52,8 @@ func _majority_vote(output_values):
 	return tempPred
 
 func _predict(newX):
+	if not _check_fitted("DTDAKNN", X):
+		return []
 	var pred = []
 	for i in newX.size():
 		var neighbors = _get_neighbors(newX[i])
