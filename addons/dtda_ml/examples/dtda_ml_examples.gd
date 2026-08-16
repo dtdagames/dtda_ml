@@ -43,6 +43,7 @@ func _ready():
 	_linreg_example()
 	_logreg_example()
 	_svm_example()
+	_tree_example()
 	_scaler_example()
 	_metrics_example()
 	_persistence_example()
@@ -116,6 +117,37 @@ func _svm_example():
 	svm._fit(X_train, Y_train)
 	print("SVM predictions: ", svm._predict(X_test))
 	print("SVM score: ", mltools._get_perf(svm._predict(X_test), y_test, 3), "%")
+
+func _tree_example():
+	# classification, the tree answers the majority label of the leaf
+	var X_train = mltools._dropVariable(dataLogR, dataLogR[0].size()-1)
+	var Y_train = mltools._getVariable(dataLogR, dataLogR[0].size()-1)
+	var X_test = [
+		[1, 3, 1, 0, 1, 0],
+		[2, 2, 4, 1, 1, 1],
+		[4, 1, 1, 0, 1, 0],
+	]
+	var y_test = [0, 1, 1]
+
+	var tree = DTDATree.new(3, 2, DTDATree.CLASSIFIER)
+	tree._fit(X_train, Y_train)
+	print("Tree predictions: ", tree._predict(X_test))
+	print("Tree score: ", mltools._accuracy(tree._predict(X_test), y_test), "%")
+
+	# regression, the tree answers the mean of the leaf
+	var X_lin = mltools._dropVariable(dataLinR, dataLinR[0].size()-1)
+	var y_lin = mltools._getVariable(dataLinR, dataLinR[0].size()-1)
+	var regressor = DTDATree.new(3, 2, DTDATree.REGRESSOR)
+	regressor._fit(X_lin, y_lin)
+	print("Tree regression: ", regressor._predict([[7.2], [9.0], [11.1]]))
+	print("Tree R2: ", mltools._r2_score(regressor._predict(X_lin), y_lin))
+
+	# a XOR, which no linear model can separate
+	var xor_X = [[0, 0], [0, 1], [1, 0], [1, 1]]
+	var xor_y = [0, 1, 1, 0]
+	var xor_tree = DTDATree.new(4, 2, DTDATree.CLASSIFIER)
+	xor_tree._fit(xor_X, xor_y)
+	print("Tree on a XOR: ", xor_tree._predict(xor_X), " expected ", xor_y)
 
 # the models scale their features on their own, use DTDAScaler for your own data
 func _scaler_example():
