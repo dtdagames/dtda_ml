@@ -1,4 +1,6 @@
 # dtda_ml
+[![tests](https://github.com/dtdagames/dtda_ml/actions/workflows/tests.yml/badge.svg)](https://github.com/dtdagames/dtda_ml/actions/workflows/tests.yml)
+
 DTDA ML allows you to run machine learning models like KNN, Linear Regression, Logistic Regression, SVM
 
 
@@ -11,6 +13,16 @@ DTDA ML allows you to run machine learning models like KNN, Linear Regression, L
 
 All of them can be scored with the usual metrics, and saved to a JSON file to be reloaded later.
 
+
+=== Running the tests ===
+
+The repository is also a small Godot project, so you can open it directly and press F6 on addons/dtda_ml/examples/examples_scene.tscn to see every model run.
+
+The test suite lives in tests/ and needs no framework. Run it headless from the project root:
+- godot --headless --script res://tests/run_tests.gd
+
+It prints one line per failure and ends with a count, exiting with 0 when everything passes. Some tests exercise the guards of the addon on purpose, so the output contains expected "MLTools: ..." errors: only the FAIL lines and the final count matter.
+The same command runs on every push and pull request, against several Godot versions.
 
 === MLTools features ===
 

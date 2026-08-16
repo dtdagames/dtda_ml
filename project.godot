@@ -1,0 +1,11 @@
+; Minimal project so the addon can be opened, the examples scene run,
+; and the test suite executed headless in CI.
+
+config_version=5
+
+[application]
+
+config/name="dtda_ml"
+config/description="Machine learning models for Godot."
+run/main_scene="res://addons/dtda_ml/examples/examples_scene.tscn"
+config/features=PackedStringArray("4.3")

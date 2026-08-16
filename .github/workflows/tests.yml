@@ -1,0 +1,41 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  tests:
+    name: Godot ${{ matrix.godot }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        godot: ["4.3", "4.4.1"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Godot ${{ matrix.godot }}
+        run: |
+          set -euo pipefail
+          BUILD="Godot_v${{ matrix.godot }}-stable_linux.x86_64"
+          URL="https://github.com/godotengine/godot/releases/download/${{ matrix.godot }}-stable/${BUILD}.zip"
+          echo "Downloading $URL"
+          curl -fsSL -o godot.zip "$URL"
+          unzip -q godot.zip
+          sudo mv "$BUILD" /usr/local/bin/godot
+          sudo chmod +x /usr/local/bin/godot
+          godot --headless --version
+
+      # first import generates .godot/ and registers the class_name globals.
+      # it reports missing UIDs and other cosmetic issues on a fresh checkout,
+      # so its exit code is not what tells us whether the addon works
+      - name: Import the project
+        continue-on-error: true
+        run: godot --headless --path . --import
+
+      - name: Run the tests
+        run: godot --headless --path . --script res://tests/run_tests.gd
