@@ -1,16 +1,18 @@
 class_name MLTools
 
-# scaling of the training features, shared by the gradient descent models
-var X_mean
-var X_std
+# shared check for every function comparing predictions to expected labels
+func _check_pair(caller, y_pred, y_test):
+	if y_pred.size() == 0:
+		push_error("MLTools: %s called without any prediction" % caller)
+		return false
+	if y_pred.size() != y_test.size():
+		push_error("MLTools: %s got %d predictions for %d expected labels" % [caller, y_pred.size(), y_test.size()])
+		return false
+	return true
 
 # type : 0 KNN, 1 linear reg, 2 logistic reg, 3 SVM
 func _get_perf(y_pred, y_test, type):
-	if y_pred.size() == 0:
-		push_error("MLTools: _get_perf() called without any prediction")
-		return 0.0
-	if y_pred.size() != y_test.size():
-		push_error("MLTools: _get_perf() got %d predictions for %d expected labels" % [y_pred.size(), y_test.size()])
+	if not _check_pair("_get_perf()", y_pred, y_test):
 		return 0.0
 
 	# convert >0.5 to 1 from prediction for linear regression
@@ -197,25 +199,171 @@ func _std_array(x):
 	return deviation
 
 # report a clear error instead of crashing deep in the math
-func _check_fitted(model_name, trained_value):
+func _check_fitted(model_name, trained_value, called = "_predict()"):
 	if trained_value == null:
-		push_error("%s: _predict() called before _fit()" % model_name)
+		push_error("%s: %s called before _fit()" % [model_name, called])
 		return false
 	return true
 
-# mean and standard deviation of each feature, to be called by _fit
-func _fit_feature_scaling(newX):
-	X_mean = []
-	X_std = []
-	for column in _transpose_array(newX):
-		X_mean.push_back(_mean_array(column))
-		X_std.push_back(_std_array(column))
-
-# center and reduce the features, keeps the gradient descent stable whatever the scale of the data
-func _scale_features(newX):
+# wrap a 1D array into a single column matrix, so DTDAScaler can handle a target
+func _column_to_matrix(x):
 	var matrix = []
-	for i in newX.size():
-		matrix.push_back([])
-		for u in newX[i].size():
-			matrix[i].push_back((newX[i][u] - X_mean[u]) / X_std[u])
+	for i in x.size():
+		matrix.push_back([x[i]])
 	return matrix
+
+# unwrap a single column matrix back into a 1D array
+func _matrix_to_column(x):
+	var column = []
+	for i in x.size():
+		column.push_back(x[i][0])
+	return column
+
+# === Classification metrics === #
+
+# percentage of correct answers
+func _accuracy(y_pred, y_test):
+	if not _check_pair("_accuracy()", y_pred, y_test):
+		return 0.0
+	var correct = 0
+	for i in y_pred.size():
+		if y_pred[i] == y_test[i]:
+			correct += 1
+	return snapped(float(correct) / float(y_pred.size()) * 100, 0.01)
+
+# true/false positives and negatives around a given positive label
+func _confusion_matrix(y_pred, y_test, positive = 1):
+	if not _check_pair("_confusion_matrix()", y_pred, y_test):
+		return {}
+	var counts = {"tp": 0, "fp": 0, "tn": 0, "fn": 0}
+	for i in y_pred.size():
+		var predicted_positive = y_pred[i] == positive
+		var actually_positive = y_test[i] == positive
+		if predicted_positive and actually_positive:
+			counts["tp"] += 1
+		elif predicted_positive:
+			counts["fp"] += 1
+		elif actually_positive:
+			counts["fn"] += 1
+		else:
+			counts["tn"] += 1
+	return counts
+
+# share of the predicted positives that are right, from 0 to 1
+func _precision(y_pred, y_test, positive = 1):
+	var counts = _confusion_matrix(y_pred, y_test, positive)
+	if counts.is_empty():
+		return 0.0
+	var predicted = counts["tp"] + counts["fp"]
+	# nothing was predicted positive, so nothing was predicted wrong either
+	if predicted == 0:
+		return 0.0
+	return snapped(float(counts["tp"]) / float(predicted), 0.0001)
+
+# share of the real positives that were found, from 0 to 1
+func _recall(y_pred, y_test, positive = 1):
+	var counts = _confusion_matrix(y_pred, y_test, positive)
+	if counts.is_empty():
+		return 0.0
+	var actual = counts["tp"] + counts["fn"]
+	if actual == 0:
+		return 0.0
+	return snapped(float(counts["tp"]) / float(actual), 0.0001)
+
+# harmonic mean of precision and recall, from 0 to 1
+func _f1_score(y_pred, y_test, positive = 1):
+	var p = _precision(y_pred, y_test, positive)
+	var r = _recall(y_pred, y_test, positive)
+	if p + r == 0:
+		return 0.0
+	return snapped(2 * p * r / (p + r), 0.0001)
+
+# === Regression metrics === #
+
+# mean squared error
+func _mse(y_pred, y_test):
+	if not _check_pair("_mse()", y_pred, y_test):
+		return 0.0
+	var total = 0.0
+	for i in y_pred.size():
+		total += (y_test[i] - y_pred[i])**2
+	return total / float(y_pred.size())
+
+# root mean squared error, in the unit of the target
+func _rmse(y_pred, y_test):
+	return sqrt(_mse(y_pred, y_test))
+
+# mean absolute error, less sensitive to outliers than the RMSE
+func _mae(y_pred, y_test):
+	if not _check_pair("_mae()", y_pred, y_test):
+		return 0.0
+	var total = 0.0
+	for i in y_pred.size():
+		total += abs(y_test[i] - y_pred[i])
+	return total / float(y_pred.size())
+
+# share of the variance explained by the model, 1.0 is a perfect fit
+# a model worse than always answering the mean scores below 0
+func _r2_score(y_pred, y_test):
+	if not _check_pair("_r2_score()", y_pred, y_test):
+		return 0.0
+	var mean = _mean_array(y_test)
+	var residual = 0.0
+	var total = 0.0
+	for i in y_test.size():
+		residual += (y_test[i] - y_pred[i])**2
+		total += (y_test[i] - mean)**2
+	# every expected value is the same, the variance to explain is null
+	if total == 0.0:
+		return 0.0
+	return snapped(1.0 - residual / total, 0.0001)
+
+# === Saving and loading === #
+
+# overridden by every model
+func _to_dict():
+	push_error("MLTools: this class cannot be saved")
+	return {}
+
+func _from_dict(_data):
+	push_error("MLTools: this class cannot be loaded")
+	return false
+
+# guard against loading a KNN file into a linear regression
+func _check_model_name(data, expected):
+	var found = data.get("model", "unknown")
+	if found != expected:
+		push_error("%s: this file holds a '%s' model" % [expected, found])
+		return false
+	return true
+
+# write a trained model to a JSON file, returns true on success
+# use a user:// path, res:// is read only once the game is exported
+func _save(path):
+	var data = _to_dict()
+	if data.is_empty():
+		return false
+	var file = FileAccess.open(path, FileAccess.WRITE)
+	if file == null:
+		push_error("MLTools: cannot write %s (%s)" % [path, error_string(FileAccess.get_open_error())])
+		return false
+	# full precision, otherwise the weights are truncated on the way out
+	file.store_string(JSON.stringify(data, "\t", true, true))
+	file.close()
+	return true
+
+# read a model back from a JSON file, returns true on success
+func _load(path):
+	if not FileAccess.file_exists(path):
+		push_error("MLTools: %s does not exist" % path)
+		return false
+	var file = FileAccess.open(path, FileAccess.READ)
+	if file == null:
+		push_error("MLTools: cannot read %s (%s)" % [path, error_string(FileAccess.get_open_error())])
+		return false
+	var data = JSON.parse_string(file.get_as_text())
+	file.close()
+	if typeof(data) != TYPE_DICTIONARY:
+		push_error("MLTools: %s is not a valid model file" % path)
+		return false
+	return _from_dict(data)

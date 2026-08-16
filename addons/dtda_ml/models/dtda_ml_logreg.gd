@@ -11,6 +11,7 @@ var W
 var b
 var X
 var Y
+var scaler
 
 func _init(newRate:float, newIterations:int):
 	rate = newRate
@@ -36,8 +37,8 @@ func _fit(newX, newY):
 	W = _array_zeros(n)
 	b = 0
 	# standardized features, otherwise exp() overflows as soon as the data gets large
-	_fit_feature_scaling(newX)
-	X = _scale_features(newX)
+	scaler = DTDAScaler.new()
+	X = scaler._fit_transform(newX)
 	Y = newY
 
 	for i in iterations:
@@ -55,10 +56,37 @@ func _sigmoid(newX, newW, newB):
 func _predict(newX):
 	if not _check_fitted("DTDALogReg", W):
 		return []
-	var Z = _sigmoid(_scale_features(newX), W, b)
+	var Z = _sigmoid(scaler._transform(newX), W, b)
 	var matrix = []
 	for i in Z:
 		matrix.push_back(round(i))
 	return matrix
+
+func _to_dict():
+	if not _check_fitted("DTDALogReg", W, "_save()"):
+		return {}
+	return {
+		"model": "DTDALogReg",
+		"version": 1,
+		"rate": rate,
+		"iterations": iterations,
+		"W": W,
+		"b": b,
+		"scaler": scaler._to_dict(),
+	}
+
+func _from_dict(data):
+	if not _check_model_name(data, "DTDALogReg"):
+		return false
+	rate = data.get("rate", rate)
+	iterations = data.get("iterations", iterations)
+	W = data.get("W")
+	b = data.get("b", 0)
+	if W == null:
+		push_error("DTDALogReg: the saved model has no weights")
+		return false
+	n = W.size()
+	scaler = DTDAScaler.new()
+	return scaler._from_dict(data.get("scaler", {}))
 
 # === End Logistic Regression model === #
