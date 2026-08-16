@@ -65,6 +65,7 @@ Example:
 === Logistic Regression Model ===
 
 Use DTDALogReg.new() to create a new model. _fit() and _predict() allows you to train and use the model. This model is only for classification (1 or 0).
+Like Linear Regression, the features are standardized internally by _fit(), so you don't have to scale them yourself.
 
 Example:
 - var logreg = DTDALogReg.new(0.01, 1000)
@@ -77,6 +78,7 @@ Example:
 === SVM Model ===
 
 Use DTDASVM.new() to create a new model. _fit() and _predict() allows you to train and use the model. This model is only for classification (1 or -1).
+The features are standardized internally by _fit() as well. A point sitting exactly on the decision boundary is predicted as 1.
 
 Example:
 - var svm = DTDASVM.new(0.01, 0.01, 1000)

@@ -1,7 +1,18 @@
 class_name MLTools
 
+# scaling of the training features, shared by the gradient descent models
+var X_mean
+var X_std
+
 # type : 0 KNN, 1 linear reg, 2 logistic reg, 3 SVM
 func _get_perf(y_pred, y_test, type):
+	if y_pred.size() == 0:
+		push_error("MLTools: _get_perf() called without any prediction")
+		return 0.0
+	if y_pred.size() != y_test.size():
+		push_error("MLTools: _get_perf() got %d predictions for %d expected labels" % [y_pred.size(), y_test.size()])
+		return 0.0
+
 	# convert >0.5 to 1 from prediction for linear regression
 	if type == 1:
 		y_pred = _normalize_int(y_pred)
@@ -44,13 +55,13 @@ func _normalize_int(tempData):
 			row = 0
 		newData.push_back(row)
 	return newData
-# convert value to -1/1 from array
+# convert value to -1/1 from array, a value sitting exactly on the boundary goes to 1
 func _sign_array(x):
 	var matrix = []
 	for row in x:
-		if row>0:
+		if row>=0:
 			row = 1
-		elif row<0:
+		else:
 			row = -1
 		matrix.push_back(row)
 	return matrix
@@ -184,3 +195,27 @@ func _std_array(x):
 	if deviation == 0.0:
 		return 1.0
 	return deviation
+
+# report a clear error instead of crashing deep in the math
+func _check_fitted(model_name, trained_value):
+	if trained_value == null:
+		push_error("%s: _predict() called before _fit()" % model_name)
+		return false
+	return true
+
+# mean and standard deviation of each feature, to be called by _fit
+func _fit_feature_scaling(newX):
+	X_mean = []
+	X_std = []
+	for column in _transpose_array(newX):
+		X_mean.push_back(_mean_array(column))
+		X_std.push_back(_std_array(column))
+
+# center and reduce the features, keeps the gradient descent stable whatever the scale of the data
+func _scale_features(newX):
+	var matrix = []
+	for i in newX.size():
+		matrix.push_back([])
+		for u in newX[i].size():
+			matrix[i].push_back((newX[i][u] - X_mean[u]) / X_std[u])
+	return matrix

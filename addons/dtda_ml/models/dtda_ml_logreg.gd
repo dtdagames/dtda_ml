@@ -35,23 +35,27 @@ func _fit(newX, newY):
 	n = newX[0].size()
 	W = _array_zeros(n)
 	b = 0
-	X = newX
+	# standardized features, otherwise exp() overflows as soon as the data gets large
+	_fit_feature_scaling(newX)
+	X = _scale_features(newX)
 	Y = newY
-	
+
 	for i in iterations:
 		_update_weights(i)
 
 func _sigmoid(newX, newW, newB):
 	# 1/(1 + e(-(x.dot(w) + b)
 	var dotXW = _dot_product(newX, newW)
-	var dotXWb = _add_arrays_const(dotXW, b)
+	var dotXWb = _add_arrays_const(dotXW, newB)
 	var dotXWbn = _multiply_array_coef(dotXWb, -1)
 	var expXWb = _exp_array_(dotXWbn)
 	var expXWb1 = _add_arrays_const(expXWb, 1)
 	return _divide_inverse_array_coef(expXWb1, 1)
 
 func _predict(newX):
-	var Z = _sigmoid(newX, W, b)
+	if not _check_fitted("DTDALogReg", W):
+		return []
+	var Z = _sigmoid(_scale_features(newX), W, b)
 	var matrix = []
 	for i in Z:
 		matrix.push_back(round(i))

@@ -11,34 +11,13 @@ var W
 var b
 var X
 var Y
-# scaling of the training set, features and target are standardized before the descent
-var X_mean
-var X_std
+# scaling of the target, the features are scaled by MLTools
 var Y_mean
 var Y_std
 
 func _init(newRate:float, newIterations:int):
 	rate = newRate
 	iterations = newIterations
-
-# mean and standard deviation of each feature and of the target
-func _compute_scaling(newX, newY):
-	X_mean = []
-	X_std = []
-	for column in _transpose_array(newX):
-		X_mean.push_back(_mean_array(column))
-		X_std.push_back(_std_array(column))
-	Y_mean = _mean_array(newY)
-	Y_std = _std_array(newY)
-
-# center and reduce the features, keeps the gradient descent stable on raw data
-func _scale_features(newX):
-	var matrix = []
-	for i in newX.size():
-		matrix.push_back([])
-		for u in newX[i].size():
-			matrix[i].push_back((newX[i][u] - X_mean[u]) / X_std[u])
-	return matrix
 
 # center and reduce the target
 func _scale_target(newY):
@@ -70,7 +49,9 @@ func _fit(newX, newY):
 	m = newX.size()
 	n = newX[0].size()
 	
-	_compute_scaling(newX, newY)
+	_fit_feature_scaling(newX)
+	Y_mean = _mean_array(newY)
+	Y_std = _std_array(newY)
 
 	W = _array_zeros(n)
 	b = 0
@@ -81,6 +62,8 @@ func _fit(newX, newY):
 		_update_weights()
 
 func _predict(newX):
+	if not _check_fitted("DTDALinReg", W):
+		return []
 	var pred = _predict_scaled(_scale_features(newX))
 	# back to the unit of the training target
 	return _add_arrays_const(_multiply_array_coef(pred, Y_std), Y_mean)
