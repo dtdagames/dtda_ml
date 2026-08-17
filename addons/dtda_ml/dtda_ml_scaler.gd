@@ -26,9 +26,12 @@ func _fit(X):
 		if mode == MINMAX:
 			var low = column.min()
 			var high = column.max()
-			offsets.push_back(low)
+			# float() is load bearing: on a column of integers, high - low would stay
+			# an integer and _transform would then do an integer division, so a value
+			# such as 40000 / 81000 would come out as 0 instead of 0.49
+			offsets.push_back(float(low))
 			# a constant column would divide by zero
-			scales.push_back(1.0 if high == low else high - low)
+			scales.push_back(1.0 if high == low else float(high - low))
 		else:
 			offsets.push_back(_mean_array(column))
 			# _std_array already returns 1.0 on a constant column

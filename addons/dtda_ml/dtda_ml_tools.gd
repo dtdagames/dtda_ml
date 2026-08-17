@@ -119,17 +119,18 @@ func _multiply_array_coef(x1, b):
 		matrix.push_back(x1[i] * b)
 	return matrix
 # divide rows of array by coef
+# float() so a division between two integers does not discard the decimal part
 func _divide_array_coef(x1, b):
 	var matrix = []
 	for i in x1.size():
-		matrix.push_back(x1[i] / b)
+		matrix.push_back(x1[i] / float(b))
 	return matrix
 
-# divide coef by rows 
+# divide coef by rows
 func _divide_inverse_array_coef(x1, b):
 	var matrix = []
 	for i in x1.size():
-		matrix.push_back(b / x1[i])
+		matrix.push_back(float(b) / x1[i])
 	return matrix
 
 # return rows of array by exp
