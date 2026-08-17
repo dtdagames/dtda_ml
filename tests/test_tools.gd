@@ -1,5 +1,8 @@
 # MLTools helpers, metrics and DTDAScaler.
 
+# how many assertions this suite runs, checked by the runner
+const PLAN = 43
+
 func _run(t):
 	var ml = MLTools.new()
 

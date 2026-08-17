@@ -42,6 +42,9 @@ func _scale_rows(rows, factor):
 			scaled[i].push_back(rows[i][u] * factor)
 	return scaled
 
+# how many assertions this suite runs, checked by the runner
+const PLAN = 25
+
 func _run(t):
 	var ml = MLTools.new()
 
@@ -126,9 +129,11 @@ func _run(t):
 	t.section("Persistence guards (the errors below are expected)")
 	# a linear regression must refuse a file holding a KNN
 	var wrong = DTDALinReg.new(0.01, 1000)
-	t.check("_load refuses another kind of model", not wrong._load(knn_path))
-	t.check("_load refuses a missing file", not DTDALinReg.new(0.01, 1000)._load("user://does_not_exist.json"))
-	t.check("_save refuses a model that was never fitted", not DTDALinReg.new(0.01, 1000)._save(path))
+	# check_equal against false, not "not <call>": a call that raises a script error
+	# answers null, which "not" reads as a success
+	t.check_equal("_load refuses another kind of model", wrong._load(knn_path), false)
+	t.check_equal("_load refuses a missing file", DTDALinReg.new(0.01, 1000)._load("user://does_not_exist.json"), false)
+	t.check_equal("_save refuses a model that was never fitted", DTDALinReg.new(0.01, 1000)._save(path), false)
 
 	t.section("Fit guards (the errors below are expected)")
 	t.check_empty("KNN _predict before _fit", DTDAKNN.new(3)._predict([[1]]))
