@@ -15,6 +15,9 @@ func _run(t):
 	t.check_near("_std_array returns 1.0 on a constant column", ml._std_array([7, 7, 7]), 1.0)
 	t.check_equal("_column_to_matrix", ml._column_to_matrix([1, 2]), [[1], [2]])
 	t.check_equal("_matrix_to_column", ml._matrix_to_column([[1], [2]]), [1, 2])
+	# dividing integers must keep the decimal part, 1 / 2 is 0.5 and not 0
+	t.check_near_array("_divide_array_coef on integers", ml._divide_array_coef([1, 3], 2), [0.5, 1.5])
+	t.check_near_array("_divide_inverse_array_coef on integers", ml._divide_inverse_array_coef([2, 4], 1), [0.5, 0.25])
 
 	t.section("MLTools sign")
 	# a value of exactly 0 must land on 1, class 0 does not exist in a -1/1 model
@@ -69,6 +72,20 @@ func _run(t):
 	var restored = minmax._inverse_transform(scaled)
 	t.check_near_array("_inverse_transform restores the first row", restored[0], raw[0])
 	t.check_near_array("_inverse_transform restores the last row", restored[2], raw[2])
+
+	# a column of integers must not trigger an integer division. 40000 / 81000
+	# came out as 0 until the scaler forced its offset and scale to floats,
+	# and the float literals above were not enough to catch it
+	var integers = [
+		[40000],
+		[80000],
+		[121000],
+	]
+	var int_minmax = DTDAScaler.new(DTDAScaler.MINMAX)
+	var int_scaled = int_minmax._fit_transform(integers)
+	t.check_near_array("min-max on an integer column", int_scaled[1], [40000.0 / 81000.0])
+	t.check_near_array("_inverse_transform on an integer column",
+		int_minmax._inverse_transform(int_scaled)[1], [80000.0])
 
 	var standard = DTDAScaler.new()
 	var centered = standard._fit_transform(raw)
