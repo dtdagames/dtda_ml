@@ -10,14 +10,20 @@ class_name DTDAQLearning
 # States and actions are free, they are not assumed to be contiguous integers. Both are
 # keyed by str(), which is also what a JSON object needs, so a table written to disk comes
 # back usable with the very same native values. What that costs:
-#  - two states sharing the same str(), the integer 1 and the string "1", share a row.
-#    Inside one state, two actions sharing the same str(), the integer 2 and the float
-#    2.0, share a cell
-#  - across two states those actions keep their own q values, but their type does not:
-#    it is remembered once for the whole agent, so learning 2.0 anywhere makes every
-#    state answer 2.0 where 2 was played. Do not mix 2 and 2.0 as two different actions
-#  - str() keeps 14 significant digits, so 1.0/3.0 comes back very close but not equal.
-#    Quantize a continuous state before using it as a key
+#  - two values with the same str() are the same key: the integer 1 and the string "1"
+#    share a row, and inside one state the integer 2 and the string "2" share a cell.
+#    Which pairs collide follows the number formatting of the engine, and that does
+#    move: str(2.0) prints "2" up to Godot 4.3 and "2.0" from 4.4 on, so a whole float
+#    and an integer are one key on 4.3 and two on 4.4. Use one spelling per action
+#  - across two states colliding actions keep their own q values, but not their type:
+#    it is remembered once for the whole agent, so the last one learned decides what
+#    _predict() hands back everywhere, in every state
+#  - a float key goes through str(), which may not carry every digit of a double:
+#    depending on the engine, 1.0/3.0 comes back exactly or a hair off. Quantize a
+#    continuous state, a position for instance, rather than rely on either
+#  - a file holding float keys is tied to the engine it was written on, for the same
+#    reason: an agent saved on 4.3 with the state 2.0 wrote the key "2", which 4.4
+#    spells "2.0" and would no longer find. Integer and string keys are unaffected
 # An action is answered back with its own type for int, float, bool, String and
 # StringName, anything else comes back as its string key and warns when saved.
 

@@ -209,9 +209,11 @@ The loop:
 States and actions can be anything, they are not assumed to be contiguous integers: a Vector2i tile, a string, a dictionary key. Both are stored by their str(), which is also what a JSON object needs, so a saved agent comes back keyed exactly the same way. An action is answered back with its own type for int, float, bool, String and StringName.
 
 What keying by str() costs, in exchange:
-- two states with the same str(), the integer 1 and the string "1", share a row. Inside one state, the integer 2 and the float 2.0 are one and the same cell
-- across two states those keep their own values, but not their type: the type of an action is remembered once for the whole agent, so learning 2.0 anywhere makes every state answer 2.0 where 2 was played. Do not mix 2 and 2.0 as two different actions
-- str() keeps 14 significant digits, so a float key such as 1.0/3.0 comes back very close but not equal. Quantize a continuous state, a position for instance, before using it as a key
+- two values with the same str() are the same key: the integer 1 and the string "1" share a row, and inside one state the integer 2 and the string "2" share a cell. Use one spelling per state and per action
+- which pairs collide follows the number formatting of the engine, and that moves between versions: str(2.0) prints "2" up to Godot 4.3 and "2.0" from 4.4 on, so a whole float and an integer are one key on 4.3 and two different ones on 4.4. Do not rely on either behaviour
+- across two states, colliding actions keep their own values but not their type: the type of an action is remembered once for the whole agent, so the last one learned decides what _predict() hands back everywhere
+- a float key goes through str(), which may not carry every digit of a double: depending on the engine version, 1.0/3.0 comes back exactly or a hair off. Quantize a continuous state, a position for instance, rather than rely on either
+- for the same reason, a file holding float keys is tied to the engine it was written on: an agent saved on 4.3 with the state 2.0 wrote the key "2", which 4.4 spells "2.0" and would no longer find. Integer and string keys are unaffected
 
 A saved agent carries the version of the format it was written in, and _load() refuses anything else rather than reading it wrong.
 

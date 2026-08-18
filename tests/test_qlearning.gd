@@ -192,23 +192,34 @@ func _run(t):
 
 	# the price of keying by str(), pinned here so it stays a documented limit and not
 	# a surprise: two actions with the same str() are one and the same cell, and the
-	# type registry keeps the last one for the whole agent
+	# type registry keeps the last one for the whole agent.
+	# the pair is the integer 2 and the string "2", not 2 and 2.0: str() of a whole
+	# float prints "2" up to Godot 4.3 and "2.0" from 4.4 on, so a float pair would
+	# pin the number formatting of the engine instead of the rule of the model.
+	# int and String have kept the same str() all along, and 2 next to "2" is the
+	# realistic mistake anyway, an action read from a config file next to one written
+	# in code
 	var collide = DTDAQLearning.new(1.0, 0.9, 0.0)
 	collide._learn("s", 2, 1, "end", [], true)
-	collide._learn("s", 2.0, 5, "end", [], true)
-	t.check_equal("two actions with the same str() share one cell", collide.q_table["s"].size(), 1)
+	collide._learn("s", "2", 5, "end", [], true)
+	# through _known_actions() rather than q_table["s"], so the assertion asks how many
+	# cells that row holds without spelling the internal key out itself
+	t.check_equal("two actions with the same str() share one cell", collide._known_actions("s").size(), 1)
 	t.check_near("the second one overwrites the first", collide._get_q("s", 2), 5.0)
-	t.check_equal("and the last type learned wins", typeof(collide._predict("s")), TYPE_FLOAT)
+	# this one is about the type registry alone, not about the collision: "2" was
+	# learned second and carries the higher q value, so it would come out on top of
+	# two separate cells just as well. The collision is what the two lines above pin
+	t.check_equal("and the last type learned wins", typeof(collide._predict("s")), TYPE_STRING)
 	# across two states there is no shared cell, the values stay apart...
 	var apart = DTDAQLearning.new(1.0, 0.9, 0.0)
 	apart._learn("roomA", 2, 1, "end", [], true)
-	apart._learn("roomB", 2.0, 5, "end", [], true)
+	apart._learn("roomB", "2", 5, "end", [], true)
 	t.check_equal("two states keep their own row for the same action key",
-		[apart._get_q("roomA", 2), apart._get_q("roomB", 2.0)], [1.0, 5.0])
-	# ...but the type registry is global: roomA played the integer 2 and is
-	# answered the float 2.0, without any cell being shared
+		[apart._get_q("roomA", 2), apart._get_q("roomB", "2")], [1.0, 5.0])
+	# ...but the type registry is global: roomA played the integer 2 and is answered
+	# the string "2", no cell being shared. That one bites, "2" == 2 raises in GDScript
 	t.check_equal("the type of an action is global to the agent",
-		typeof(apart._predict("roomA")), TYPE_FLOAT)
+		typeof(apart._predict("roomA")), TYPE_STRING)
 
 	t.section("Q-Learning, saving and loading")
 	var path = "user://dtda_ml_test_qlearning.json"
@@ -259,8 +270,13 @@ func _run(t):
 	t.check_equal("a StringName action keeps its type",
 		typeof(named_back._predict("hall")), TYPE_STRING_NAME)
 
-	# str() keeps 14 significant digits, so a float key is not exact on the way back.
-	# this is the documented limit, pinned so it cannot silently get worse
+	# a float key goes through str(), which may or may not carry every digit of a
+	# double depending on the engine. What the model owes is that the file adds
+	# nothing to that: the expectation is float(str(x)), not x, so the assertion
+	# stays out of the number formatting business where 4.3 and 4.4 differ. Both
+	# sides move together when str() changes, which is what makes it version proof.
+	# it is not str() compared with itself either: the left hand side went to disk
+	# and back through JSON, and a _key() rounding more than str() still fails here
 	var third_path = "user://dtda_ml_test_qlearning_third.json"
 	var third = DTDAQLearning.new(1.0, 0.9, 0.0)
 	third._learn("hall", 1.0 / 3.0, 1, "end", [], true)
@@ -269,7 +285,9 @@ func _run(t):
 	third_back._load(third_path)
 	t.check_equal("a long float action still comes back as a float",
 		typeof(third_back._predict("hall")), TYPE_FLOAT)
-	t.check_near("close to what it was, to 14 digits", third_back._predict("hall"), 1.0 / 3.0, 1e-13)
+	# no tolerance at all: the round trip through the file must be exact
+	t.check_near("a float key survives the file as well as str() allows",
+		third_back._predict("hall"), float(str(1.0 / 3.0)), 0.0)
 
 	# the type is written as a stable label, not as the raw value of an engine enum
 	var raw_file = FileAccess.open(numeric_path, FileAccess.READ)
