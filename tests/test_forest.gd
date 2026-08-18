@@ -21,7 +21,7 @@ const DATA_LOGR = [
 ]
 
 # how many assertions this suite runs, checked by the runner
-const PLAN = 47
+const PLAN = 48
 
 # A noisy world with one feature that matters and five that do not.
 # The label follows x0 alone, and one row in eight carries the wrong one: that is the
@@ -225,6 +225,10 @@ func _run(t):
 	# the forest hands each entry to DTDATree, whose own guards answer for it
 	t.check_equal("_load refuses a tree whose root is not a node",
 		_load_written('{"model": "DTDAForest", "version": 1, "trees": [{"model": "DTDATree", "version": 1, "root": "nope"}]}'), false)
+	# a file a forest could read from end to end, wrong on the "model" field alone:
+	# the DTDAKNN file above is turned away by the guards on the structure
+	t.check_equal("DTDAForest refuses a file that only lies about its model name",
+		_load_written('{"model": "NotAForest", "version": 1, "mode": 0, "num_trees": 1, "max_depth": 5, "min_samples_split": 2, "max_features": 0, "trees": [{"model": "DTDATree", "version": 1, "root": {"leaf": 1}}]}'), false)
 	t.check_equal("_load refuses a list holding something that is not a tree",
 		_load_written('{"model": "DTDAForest", "version": 1, "trees": [{"model": "DTDAKNN", "version": 1}]}'), false)
 	# a refused file must not take the standing forest down with it

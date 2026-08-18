@@ -50,7 +50,7 @@ func _load_written(content, agent = null):
 	return agent._load(path)
 
 # how many assertions this suite runs, checked by the runner
-const PLAN = 83
+const PLAN = 84
 
 func _run(t):
 	t.section("Q-Learning, the Bellman update step by step")
@@ -330,6 +330,10 @@ func _run(t):
 	other._save(other_path)
 	t.check_equal("_load refuses another kind of model", DTDAQLearning.new()._load(other_path), false)
 	t.check_equal("_load refuses a missing file", DTDAQLearning.new()._load("user://no_such_agent.json"), false)
+	# a file an agent could read from end to end, wrong on the "model" field alone:
+	# the DTDAKNN file above is turned away by the guards on the structure
+	t.check_equal("DTDAQLearning refuses a file that only lies about its model name",
+		_load_written('{"model": "NotQLearning", "version": 2, "q_table": {"s": {"a": 1.0}}, "actions": {"a": "string"}}'), false)
 
 	# a model file lives in user://, where a player can edit it by hand.
 	# the answer must be exactly false, the one a guard returns: a script error inside

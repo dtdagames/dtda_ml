@@ -21,7 +21,15 @@ const DATA_LOGR = [
 ]
 
 # how many assertions this suite runs, checked by the runner
-const PLAN = 29
+const PLAN = 31
+
+# write a handmade file and hand it to a model, for the guards on the file itself
+func _load_written(content, model):
+	var path = "user://dtda_ml_test_tree_handmade.json"
+	var file = FileAccess.open(path, FileAccess.WRITE)
+	file.store_string(content)
+	file.close()
+	return model._load(path)
 
 func _run(t):
 	var ml = MLTools.new()
@@ -124,13 +132,38 @@ func _run(t):
 	drawing._set_seed(9)
 	var drawn = drawing._features_for_split()
 	t.check_equal("a draw hands back as many features as asked", drawn.size(), 2)
-	t.check_equal("and never the same feature twice", drawn[0] == drawn[1], false)
-	t.check("every feature drawn is one that exists",
-		drawn[0] >= 0 and drawn[0] < 6 and drawn[1] >= 0 and drawn[1] < 6)
 	var same_draw = DTDATree.new(3, 2, DTDATree.CLASSIFIER, 2)
 	same_draw._fit(X_log, y_log)
 	same_draw._set_seed(9)
 	t.check_equal("the same seed draws the same features", same_draw._features_for_split(), drawn)
+
+	# The draw is without replacement, and one sample cannot show it: two features out
+	# of six come out equal only one time in six when drawn with replacement, and the
+	# seed above is one of the five that come out clean either way. Two hundred draws
+	# of five out of six leave nothing to luck, a draw with replacement landing all
+	# distinct about nine times in a hundred: it would have to do it two hundred times
+	# in a row. Counting instead of asserting inside the loop keeps this to one
+	# assertion per property, whatever the number of rounds
+	var many = DTDATree.new(3, 2, DTDATree.CLASSIFIER, 5)
+	many._fit(X_log, y_log)
+	many._set_seed(9)
+	var repeated = 0
+	var miscounted = 0
+	var out_of_range = 0
+	for i in 200:
+		var sample = many._features_for_split()
+		if sample.size() != 5:
+			miscounted += 1
+		var seen = {}
+		for feature in sample:
+			seen[feature] = true
+			if feature < 0 or feature >= 6:
+				out_of_range += 1
+		if seen.size() != sample.size():
+			repeated += 1
+	t.check_equal("no draw among two hundred repeats a feature", repeated, 0)
+	t.check_equal("every one of them hands back as many as asked", miscounted, 0)
+	t.check_equal("and never a feature that does not exist", out_of_range, 0)
 
 	t.section("Decision tree, saving and loading")
 	var path = "user://dtda_ml_test_tree.json"
@@ -164,9 +197,10 @@ func _run(t):
 	t.check_equal("_load refuses another kind of model", DTDATree.new()._load(other_path), false)
 	# a model file lives in user://, where it can be edited by hand, and DTDAForest
 	# hands whole subtrees straight to _from_dict()
-	var handmade = "user://dtda_ml_test_tree_handmade.json"
-	var handmade_file = FileAccess.open(handmade, FileAccess.WRITE)
-	handmade_file.store_string('{"model": "DTDATree", "version": 1, "root": "not a node"}')
-	handmade_file.close()
 	t.check_equal("_load refuses a tree whose root is not a node",
-		DTDATree.new()._load(handmade), false)
+		_load_written('{"model": "DTDATree", "version": 1, "root": "not a node"}', DTDATree.new()), false)
+	# a file a tree could read in every respect but its name. The KNN file above is
+	# turned away by the guards on the structure long before the name is weighed, so
+	# it says nothing about _check_model_name(): this one says only that
+	t.check_equal("DTDATree refuses a file that only lies about its model name",
+		_load_written('{"model": "NotATree", "version": 1, "mode": 0, "max_depth": 5, "min_samples_split": 2, "root": {"leaf": 1}}', DTDATree.new()), false)
