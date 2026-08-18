@@ -4,15 +4,16 @@
 DTDA ML allows you to run machine learning models like KNN, Linear Regression, Logistic Regression, SVM
 
 
-6 models are currently available:
+7 models are currently available:
 - KNN
 - Linear Regression
 - Logistic Regression
 - SVM
 - Decision Tree
+- Random Forest
 - Q-Learning
 
-The five supervised ones can be scored with the usual metrics, and every model can be saved to a JSON file to be reloaded later.
+The six supervised ones can be scored with the usual metrics, and every model can be saved to a JSON file to be reloaded later.
 
 
 === Running the tests ===
@@ -170,6 +171,7 @@ DTDATree.new(max_depth, min_samples_split, mode) takes:
 - max_depth : how deep the tree may grow, 5 by default. The main guard against overfitting
 - min_samples_split : a node holding fewer rows than this becomes a leaf, 2 by default
 - mode : DTDATree.CLASSIFIER (the default) splits on the Gini impurity and a leaf answers the majority label, DTDATree.REGRESSOR splits on the variance and a leaf answers the mean
+- max_features : how many features a single split may look at, drawn again at every node, 0 by default. 0 means all of them, in order, and draws nothing at all, which is a tree as it has always been. It exists for DTDAForest, which needs its trees to disagree; _set_seed() fixes the draw when you use it yourself
 
 A tree compares each feature to a threshold, so the scale of your data does not matter: unlike the other models it does no scaling at all, and none is needed.
 Being made of thresholds, it also answers a constant outside the range it was trained on, where a linear regression keeps extrapolating.
@@ -183,6 +185,35 @@ Example:
 - print("Tree prediction: ", tree._predict(X_test))
 - var regressor = DTDATree.new(3, 2, DTDATree.REGRESSOR) #same model, on a continuous target
 - regressor._fit(X_train, y_train)
+
+=== Random Forest Model ===
+
+Use DTDAForest.new() to create a new forest. It grows a crowd of DTDATree and has them answer together: the majority label when classifying, the mean when regressing. A lone deep tree learns its training set by heart, noise included; a forest cannot, because no two of its trees saw the same thing.
+
+Two draws make the trees disagree, and disagreeing is the whole point, since averaging identical trees gains nothing:
+- bagging : each tree is fitted on as many rows as the training set holds, drawn with replacement, so it sees about two thirds of it and a different two thirds
+- a feature draw at every split, carried by DTDATree.max_features
+
+DTDAForest.new(num_trees, max_depth, min_samples_split, mode, max_features) takes:
+- num_trees : how many trees to grow, 10 by default. More is steadier and slower
+- max_depth : how deep each tree may grow, 5 by default. A forest tolerates deeper trees than a lone one, that being what it is for
+- min_samples_split : a node holding fewer rows than this becomes a leaf, 2 by default
+- mode : DTDAForest.CLASSIFIER (the default) votes, DTDAForest.REGRESSOR averages. They are the modes of DTDATree, taken from it, so the two cannot drift apart
+- max_features : how many features a single split may look at, 0 by default. 0 asks for the usual rule, the square root of the count when classifying and a third of it when regressing. Passing the full count turns the forest into plain bagging, which is a fair thing to want and a poor default
+
+There is a draw at every step, so _set_seed(value) is what makes a run repeatable, and _reset() forgets the trees and puts the generator back on that seed. Without a seed, two forests fitted on the same data do not answer quite the same thing.
+
+Like a lone tree, a forest compares features to thresholds and needs no scaling.
+
+Example:
+- var forest = DTDAForest.new(25, 8, 2, DTDAForest.CLASSIFIER)
+- forest._set_seed(1)
+- forest._fit(X_train, y_train)
+- print("Forest prediction: ", forest._predict(X_test))
+- print("Accuracy: ", ml._accuracy(forest._predict(X_test), y_test), "%")
+- forest._save("user://forest.json")
+
+A word on what to expect: on a small test set, a single forest can land level with a single tree by luck, one row being worth a couple of points. The gain is real but it is an average. The examples scene and the test suite both measure it over five seeds rather than one, and so should you.
 
 === Q-Learning Model ===
 

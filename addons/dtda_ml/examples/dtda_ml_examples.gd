@@ -44,6 +44,7 @@ func _ready():
 	_logreg_example()
 	_svm_example()
 	_tree_example()
+	_forest_example()
 	_qlearning_example()
 	_scaler_example()
 	_metrics_example()
@@ -149,6 +150,55 @@ func _tree_example():
 	var xor_tree = DTDATree.new(4, 2, DTDATree.CLASSIFIER)
 	xor_tree._fit(xor_X, xor_y)
 	print("Tree on a XOR: ", xor_tree._predict(xor_X), " expected ", xor_y)
+
+# A crowd of trees, each grown on its own draw of the rows and of the features.
+# The world below has one feature that decides the label and five that are pure noise,
+# and one row in eight carries the wrong label. That is what a lone deep tree learns
+# by heart, and what a forest refuses to.
+func _forest_rows(first, count, flip_every):
+	var X = []
+	var y = []
+	for k in count:
+		var i = first + k
+		var x0 = i % 20
+		var row = [x0]
+		for j in 5:
+			row.push_back((i * 37 + (j + 1) * 53) % 13)
+		var label = 1 if x0 >= 10 else 0
+		if flip_every > 0 and i % flip_every == 3:
+			label = 1 - label
+		X.push_back(row)
+		y.push_back(label)
+	return [X, y]
+
+func _forest_example():
+	var train = _forest_rows(0, 48, 8)
+	var unseen = _forest_rows(1000, 48, 0)
+
+	var tree = DTDATree.new(8, 2, DTDATree.CLASSIFIER)
+	tree._fit(train[0], train[1])
+	print("Lone tree, on the rows it learned: ", mltools._accuracy(tree._predict(train[0]), train[1]), "%")
+	print("Lone tree, on rows it never saw: ", mltools._accuracy(tree._predict(unseen[0]), unseen[1]), "%")
+
+	# a test set of 48 rows means one row is worth two points, so a single forest can
+	# land level with the tree by luck. Five of them, seeded so the run repeats, is
+	# what the picture actually looks like
+	var total = 0.0
+	for k in 5:
+		var forest = DTDAForest.new(25, 8, 2, DTDAForest.CLASSIFIER)
+		forest._set_seed(k + 1)
+		forest._fit(train[0], train[1])
+		total += mltools._accuracy(forest._predict(unseen[0]), unseen[1])
+	print("Forest, on rows it never saw, five seeds averaged: ", snapped(total / 5.0, 0.01), "%")
+
+	# regression, where the trees are averaged instead of voting
+	var X_lin = mltools._dropVariable(dataLinR, dataLinR[0].size()-1)
+	var y_lin = mltools._getVariable(dataLinR, dataLinR[0].size()-1)
+	var regressor = DTDAForest.new(15, 4, 2, DTDAForest.REGRESSOR)
+	regressor._set_seed(1)
+	regressor._fit(X_lin, y_lin)
+	print("Forest regression: ", regressor._predict([[7.2], [9.0], [11.1]]))
+	print("Forest R2: ", mltools._r2_score(regressor._predict(X_lin), y_lin))
 
 # a corridor of six rooms: room 0 is a pit, room 5 is the exit, the agent starts in room 3
 # it learns by playing, there is no training set here

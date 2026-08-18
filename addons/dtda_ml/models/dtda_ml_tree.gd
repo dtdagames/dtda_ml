@@ -7,21 +7,37 @@ class_name DTDATree
 # REGRESSOR splits on the variance and a leaf answers the mean
 enum { CLASSIFIER, REGRESSOR }
 
+# max_features is what DTDAForest needs from a tree: how many features a single split
+# may look at, drawn again at every node. 0, the default, means all of them, in order,
+# and draws nothing at all, so a tree built on its own behaves exactly as it always did.
+# A forest whose trees each looked at every feature would grow the same tree over and
+# over, and averaging identical trees gains nothing.
+
 var m
 var n
 var mode
 var max_depth
 var min_samples_split
+var max_features
+# its own generator, so a forest can hand each of its trees a reproducible stream
+var rng
 var X
 var Y
 # the tree itself, nested dictionaries of nodes
 # a branch holds feature/threshold/left/right, a leaf holds a single value
 var root
 
-func _init(tree_max_depth := 5, tree_min_samples_split := 2, tree_mode := CLASSIFIER):
+func _init(tree_max_depth := 5, tree_min_samples_split := 2, tree_mode := CLASSIFIER, tree_max_features := 0):
 	max_depth = tree_max_depth
 	min_samples_split = tree_min_samples_split
 	mode = tree_mode
+	max_features = tree_max_features
+	rng = RandomNumberGenerator.new()
+
+# fix the feature draws, for a reproducible tree. Pointless while max_features is 0,
+# where nothing is drawn
+func _set_seed(value):
+	rng.seed = value
 
 # Gini impurity of the labels held by the given rows, 0.0 when they all agree
 func _gini(rows):
@@ -64,7 +80,23 @@ func _candidate_thresholds(rows, feature):
 			thresholds.push_back((values[i] + values[i-1]) / 2.0)
 	return thresholds
 
+# the features a single split may look at, all of them in order by default
+func _features_for_split():
+	var every = []
+	for feature in n:
+		every.push_back(feature)
+	# the default path draws nothing, so it stays identical run after run
+	if max_features <= 0 or max_features >= n:
+		return every
+	# without replacement, so no feature is weighed twice in the same split
+	var drawn = []
+	for i in max_features:
+		drawn.push_back(every.pop_at(rng.randi() % every.size()))
+	return drawn
+
 # the split lowering the impurity the most, or an empty dictionary when none does
+# when max_features hides every usable feature from a node, that node finds nothing
+# and becomes a leaf. A lone tree keeps growing, only a forest can end up there
 func _best_split(rows):
 	var parent = _impurity(rows)
 	var best = {}
@@ -72,7 +104,7 @@ func _best_split(rows):
 	# root, yet each half becomes separable one level down. Only the absence of any
 	# usable threshold leaves this empty.
 	var best_gain = -1.0
-	for feature in n:
+	for feature in _features_for_split():
 		for threshold in _candidate_thresholds(rows, feature):
 			var left = []
 			var right = []
@@ -167,6 +199,7 @@ func _to_dict():
 		"mode": mode,
 		"max_depth": max_depth,
 		"min_samples_split": min_samples_split,
+		"max_features": max_features,
 		"root": root,
 	}
 
@@ -176,10 +209,18 @@ func _from_dict(data):
 	mode = int(data.get("mode", CLASSIFIER))
 	max_depth = int(data.get("max_depth", max_depth))
 	min_samples_split = int(data.get("min_samples_split", min_samples_split))
-	root = data.get("root")
-	if root == null:
+	# absent from the files written before the forest existed, and 0 is what they did
+	max_features = int(data.get("max_features", 0))
+	var saved_root = data.get("root")
+	if saved_root == null:
 		push_error("DTDATree: the saved model has no tree")
 		return false
+	# a model file lives in user://, where it can be edited by hand, and DTDAForest
+	# hands whole subtrees straight to this function
+	if typeof(saved_root) != TYPE_DICTIONARY:
+		push_error("DTDATree: the saved tree is not a node")
+		return false
+	root = saved_root
 	return true
 
 # === End Decision tree === #
