@@ -43,7 +43,15 @@ func _scale_rows(rows, factor):
 	return scaled
 
 # how many assertions this suite runs, checked by the runner
-const PLAN = 25
+const PLAN = 29
+
+# write a handmade file and hand it to a model, for the guards on the file itself
+func _load_written(content, model):
+	var path = "user://dtda_ml_test_handmade.json"
+	var file = FileAccess.open(path, FileAccess.WRITE)
+	file.store_string(content)
+	file.close()
+	return model._load(path)
 
 func _run(t):
 	var ml = MLTools.new()
@@ -134,6 +142,23 @@ func _run(t):
 	t.check_equal("_load refuses another kind of model", wrong._load(knn_path), false)
 	t.check_equal("_load refuses a missing file", DTDALinReg.new(0.01, 1000)._load("user://does_not_exist.json"), false)
 	t.check_equal("_save refuses a model that was never fitted", DTDALinReg.new(0.01, 1000)._save(path), false)
+
+	# The KNN file just refused is a KNN through and through, so what turns it away is
+	# the shape of what it holds, not the name it carries: the assertion above says
+	# nothing about _check_model_name(). Each file below is one its model could read
+	# from end to end, and wrong on the "model" field alone
+	t.check_equal("DTDAKNN refuses a file that only lies about its model name",
+		_load_written('{"model": "NotAKNN", "version": 1, "num_neighbors": 1, "X": [[0]], "Y": [1]}',
+			DTDAKNN.new(3)), false)
+	t.check_equal("DTDALinReg refuses a file that only lies about its model name",
+		_load_written('{"model": "NotALinReg", "version": 1, "rate": 0.01, "iterations": 10, "W": [1.0], "b": 0.0, "x_scaler": {"mode": 0, "offsets": [0.0], "scales": [1.0]}, "y_scaler": {"mode": 0, "offsets": [0.0], "scales": [1.0]}}',
+			DTDALinReg.new(0.01, 1000)), false)
+	t.check_equal("DTDALogReg refuses a file that only lies about its model name",
+		_load_written('{"model": "NotALogReg", "version": 1, "rate": 0.01, "iterations": 10, "W": [1.0], "b": 0.0, "scaler": {"mode": 0, "offsets": [0.0], "scales": [1.0]}}',
+			DTDALogReg.new(0.01, 1000)), false)
+	t.check_equal("DTDASVM refuses a file that only lies about its model name",
+		_load_written('{"model": "NotASVM", "version": 1, "lr": 0.01, "lambda": 0.01, "iter": 10, "W": [1.0], "b": 0.0, "scaler": {"mode": 0, "offsets": [0.0], "scales": [1.0]}}',
+			DTDASVM.new(0.01, 0.01, 1000)), false)
 
 	t.section("Fit guards (the errors below are expected)")
 	t.check_empty("KNN _predict before _fit", DTDAKNN.new(3)._predict([[1]]))
