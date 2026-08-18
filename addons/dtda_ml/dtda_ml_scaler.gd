@@ -69,13 +69,35 @@ func _to_dict():
 		"scales": scales,
 	}
 
+# A saved scaler has to be usable, not merely present. _transform() reads an offset
+# and a scale per column and divides by the scale, so a file holding a string, a list
+# shorter than the other or a zero used to load without a word and only fall apart at
+# the first prediction, or worse answer inf. A model file lives in user://, where it
+# can be edited by hand.
+# Nothing is written into the scaler until the whole dictionary has been read, so a
+# refused one leaves a working scaler exactly as it was
 func _from_dict(data):
-	mode = data.get("mode", STANDARD)
-	offsets = data.get("offsets")
-	scales = data.get("scales")
-	if offsets == null or scales == null:
+	var saved_offsets = data.get("offsets")
+	var saved_scales = data.get("scales")
+	if typeof(saved_offsets) != TYPE_ARRAY or typeof(saved_scales) != TYPE_ARRAY:
 		push_error("DTDAScaler: the saved scaler is incomplete")
 		return false
+	if saved_offsets.size() == 0 or saved_offsets.size() != saved_scales.size():
+		push_error("DTDAScaler: the saved scaler holds %d offsets and %d scales" % [saved_offsets.size(), saved_scales.size()])
+		return false
+	for i in saved_offsets.size():
+		if not (typeof(saved_offsets[i]) in [TYPE_INT, TYPE_FLOAT] and typeof(saved_scales[i]) in [TYPE_INT, TYPE_FLOAT]):
+			push_error("DTDAScaler: the saved scaler holds something that is not a number")
+			return false
+		# _transform() divides by this, and _fit() never writes a zero there: a
+		# constant column is given a scale of 1.0 for that very reason
+		if float(saved_scales[i]) == 0.0:
+			push_error("DTDAScaler: the saved scaler holds a scale of zero")
+			return false
+	# int() because a mode read back from JSON carries as a float
+	mode = int(data.get("mode", STANDARD))
+	offsets = saved_offsets
+	scales = saved_scales
 	return true
 
 # === End Feature scaler === #

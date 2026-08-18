@@ -21,7 +21,7 @@ const DATA_LOGR = [
 ]
 
 # how many assertions this suite runs, checked by the runner
-const PLAN = 31
+const PLAN = 33
 
 # write a handmade file and hand it to a model, for the guards on the file itself
 func _load_written(content, model):
@@ -202,5 +202,16 @@ func _run(t):
 	# a file a tree could read in every respect but its name. The KNN file above is
 	# turned away by the guards on the structure long before the name is weighed, so
 	# it says nothing about _check_model_name(): this one says only that
+	# a refused file must not leave its growth limits behind either: this tree was
+	# built to grow to 3 and the file it refuses asks for 99
+	var settled = DTDATree.new(3, 2, DTDATree.CLASSIFIER)
+	settled._fit(X_log, y_log)
+	var settled_before = settled._predict(X_log)
+	_load_written('{"model": "DTDATree", "version": 1, "max_depth": 99, "min_samples_split": 77, "root": "not a node"}', settled)
+	t.check_equal("a refused file leaves the growth limits alone",
+		[settled.max_depth, settled.min_samples_split], [3, 2])
+	t.check_near_array("and leaves the tree predicting as before",
+		settled._predict(X_log), settled_before)
+
 	t.check_equal("DTDATree refuses a file that only lies about its model name",
 		_load_written('{"model": "NotATree", "version": 1, "mode": 0, "max_depth": 5, "min_samples_split": 2, "root": {"leaf": 1}}', DTDATree.new()), false)

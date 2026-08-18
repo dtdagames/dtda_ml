@@ -77,16 +77,30 @@ func _to_dict():
 func _from_dict(data):
 	if not _check_model_name(data, "DTDALinReg"):
 		return false
+	# Everything is read aside first and only takes the place of the standing model
+	# once the whole file is known to be readable. Assigning as it went used to leave
+	# a working model with the weights of a file it had just refused
+	# absent, malformed and unusable answer the same way: a null is not a list either,
+	# and _predict() computes with every one of these numbers
+	var saved_W = data.get("W")
+	if not _check_number_array(saved_W, "DTDALinReg", "weights"):
+		return false
+	var saved_b = data.get("b", 0)
+	if not _check_number(saved_b, "DTDALinReg", "intercept"):
+		return false
+	var saved_x = DTDAScaler.new()
+	var saved_y = DTDAScaler.new()
+	if not saved_x._from_dict(data.get("x_scaler", {})):
+		return false
+	if not saved_y._from_dict(data.get("y_scaler", {})):
+		return false
 	rate = data.get("rate", rate)
 	iterations = data.get("iterations", iterations)
-	W = data.get("W")
-	b = data.get("b", 0)
-	if W == null:
-		push_error("DTDALinReg: the saved model has no weights")
-		return false
+	W = saved_W
+	b = saved_b
 	n = W.size()
-	x_scaler = DTDAScaler.new()
-	y_scaler = DTDAScaler.new()
-	return x_scaler._from_dict(data.get("x_scaler", {})) and y_scaler._from_dict(data.get("y_scaler", {}))
+	x_scaler = saved_x
+	y_scaler = saved_y
+	return true
 
 # === End Linear Regression model === #

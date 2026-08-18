@@ -77,12 +77,35 @@ func _to_dict():
 func _from_dict(data):
 	if not _check_model_name(data, "DTDAKNN"):
 		return false
-	num_neighbors = data.get("num_neighbors", num_neighbors)
-	X = data.get("X")
-	Y = data.get("Y")
-	if X == null or Y == null:
+	# Everything is read aside first and only takes the place of the standing model
+	# once the whole file is known to be readable. A file lives in user://, where it
+	# can be edited by hand, and a training set that is a text used to load with a
+	# success and fall apart at the first prediction
+	# _get_neighbors() counts this out at every prediction, so it belongs with X and Y
+	# and not with the settings _fit() reads: a text answered null, and a count of
+	# zero or less answered a list of nulls, in both cases after loading with a success
+	var saved_k = data.get("num_neighbors", num_neighbors)
+	if not _check_number(saved_k, "DTDAKNN", "neighbour count"):
+		return false
+	if saved_k < 1:
+		push_error("DTDAKNN: the saved neighbour count is %s, it takes at least one" % saved_k)
+		return false
+	var saved_X = data.get("X")
+	var saved_Y = data.get("Y")
+	if typeof(saved_X) != TYPE_ARRAY or typeof(saved_Y) != TYPE_ARRAY:
 		push_error("DTDAKNN: the saved model has no training set")
 		return false
+	if saved_X.size() == 0 or saved_X.size() != saved_Y.size():
+		push_error("DTDAKNN: the saved model holds %d rows and %d labels" % [saved_X.size(), saved_Y.size()])
+		return false
+	# _euclidean_distance() subtracts one row from another, column by column. The
+	# labels are left alone, a KNN answers them as they come and they can be anything
+	for row in saved_X:
+		if not _check_number_array(row, "DTDAKNN", "training row"):
+			return false
+	num_neighbors = saved_k
+	X = saved_X
+	Y = saved_Y
 	return true
 
 # === End KNN model === #

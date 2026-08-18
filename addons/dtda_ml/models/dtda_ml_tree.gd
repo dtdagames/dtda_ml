@@ -206,20 +206,20 @@ func _to_dict():
 func _from_dict(data):
 	if not _check_model_name(data, "DTDATree"):
 		return false
+	# A model file lives in user://, where it can be edited by hand, and DTDAForest
+	# hands whole subtrees straight to this function. Nothing is written into the tree
+	# until the file has been read: a refused file leaves a working tree as it was,
+	# growth limits included
+	var saved_root = data.get("root")
+	# absent and malformed answer the same way: a null is not a node either
+	if typeof(saved_root) != TYPE_DICTIONARY:
+		push_error("DTDATree: the saved model has no tree")
+		return false
 	mode = int(data.get("mode", CLASSIFIER))
 	max_depth = int(data.get("max_depth", max_depth))
 	min_samples_split = int(data.get("min_samples_split", min_samples_split))
 	# absent from the files written before the forest existed, and 0 is what they did
 	max_features = int(data.get("max_features", 0))
-	var saved_root = data.get("root")
-	if saved_root == null:
-		push_error("DTDATree: the saved model has no tree")
-		return false
-	# a model file lives in user://, where it can be edited by hand, and DTDAForest
-	# hands whole subtrees straight to this function
-	if typeof(saved_root) != TYPE_DICTIONARY:
-		push_error("DTDATree: the saved tree is not a node")
-		return false
 	root = saved_root
 	return true
 

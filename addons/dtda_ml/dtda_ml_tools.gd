@@ -330,6 +330,29 @@ func _from_dict(_data):
 	push_error("MLTools: this class cannot be loaded")
 	return false
 
+# A number a model read out of a file has to be one, not merely present. A file lives
+# in user://, where it can be edited by hand, and a text where a number belongs would
+# load and only fall apart at the first prediction
+func _check_number(value, model_name, field):
+	if not (typeof(value) in [TYPE_INT, TYPE_FLOAT]):
+		push_error("%s: the saved %s is not a number" % [model_name, field])
+		return false
+	return true
+
+# the same for a list of numbers, which also has to hold something
+func _check_number_array(values, model_name, field):
+	if typeof(values) != TYPE_ARRAY:
+		push_error("%s: the saved %s is not a list" % [model_name, field])
+		return false
+	if values.size() == 0:
+		push_error("%s: the saved %s is empty" % [model_name, field])
+		return false
+	for value in values:
+		if not (typeof(value) in [TYPE_INT, TYPE_FLOAT]):
+			push_error("%s: the saved %s holds something that is not a number" % [model_name, field])
+			return false
+	return true
+
 # guard against loading a KNN file into a linear regression
 func _check_model_name(data, expected):
 	var found = data.get("model", "unknown")
