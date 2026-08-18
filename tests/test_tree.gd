@@ -21,7 +21,7 @@ const DATA_LOGR = [
 ]
 
 # how many assertions this suite runs, checked by the runner
-const PLAN = 19
+const PLAN = 29
 
 func _run(t):
 	var ml = MLTools.new()
@@ -75,6 +75,14 @@ func _run(t):
 	blocked._fit([[0], [1]], [0, 1])
 	t.check_equal("min_samples_split blocks the split", blocked._predict([[0]]).size(), 1)
 
+	# a threshold is a midpoint between two values of the training set, so no training
+	# row ever sits exactly on one and only a prediction row can. The rule is that it
+	# goes left, and nothing else in this suite pins it: turning <= into < in
+	# _predict_row() leaves every other assertion green
+	var boundary = DTDATree.new(1, 2, DTDATree.CLASSIFIER)
+	boundary._fit([[0], [2]], [0, 1])
+	t.check_near_array("a row sitting on the threshold goes left", boundary._predict([[1.0]]), [0])
+
 	t.section("Decision tree, edge cases")
 	var single = DTDATree.new(5, 2, DTDATree.CLASSIFIER)
 	single._fit([[3, 4]], [7])
@@ -89,6 +97,40 @@ func _run(t):
 	var constant = DTDATree.new(5, 2, DTDATree.CLASSIFIER)
 	constant._fit([[5, 1], [5, 2], [5, 3]], [0, 0, 1])
 	t.check_near_array("a constant column is ignored", constant._predict([[5, 1], [5, 3]]), [0, 1])
+
+	t.section("Decision tree, how many features a split looks at")
+	# max_features is what a forest needs from a tree. 0, the default, is the tree
+	# as it always was: every feature, in order, and no draw at all
+	var every = DTDATree.new(3, 2, DTDATree.CLASSIFIER)
+	every._fit(X_log, y_log)
+	t.check_equal("the default looks at every feature in order",
+		every._features_for_split(), [0, 1, 2, 3, 4, 5])
+	# and it must not even touch the generator, or a tree standing on its own would
+	# answer differently depending on what a forest did before it
+	every._set_seed(42)
+	for i in 5:
+		every._features_for_split()
+	var untouched = DTDATree.new(3, 2, DTDATree.CLASSIFIER)
+	untouched._set_seed(42)
+	t.check_equal("the default draw leaves the generator where it was",
+		every.rng.randi(), untouched.rng.randi())
+	var wide = DTDATree.new(3, 2, DTDATree.CLASSIFIER, 99)
+	wide._fit(X_log, y_log)
+	t.check_equal("asking for more features than there are draws nothing either",
+		wide._features_for_split(), [0, 1, 2, 3, 4, 5])
+
+	var drawing = DTDATree.new(3, 2, DTDATree.CLASSIFIER, 2)
+	drawing._fit(X_log, y_log)
+	drawing._set_seed(9)
+	var drawn = drawing._features_for_split()
+	t.check_equal("a draw hands back as many features as asked", drawn.size(), 2)
+	t.check_equal("and never the same feature twice", drawn[0] == drawn[1], false)
+	t.check("every feature drawn is one that exists",
+		drawn[0] >= 0 and drawn[0] < 6 and drawn[1] >= 0 and drawn[1] < 6)
+	var same_draw = DTDATree.new(3, 2, DTDATree.CLASSIFIER, 2)
+	same_draw._fit(X_log, y_log)
+	same_draw._set_seed(9)
+	t.check_equal("the same seed draws the same features", same_draw._features_for_split(), drawn)
 
 	t.section("Decision tree, saving and loading")
 	var path = "user://dtda_ml_test_tree.json"
@@ -105,6 +147,12 @@ func _run(t):
 	t.check_near_array("a reloaded regressor predicts the same",
 		reg_back._predict([[7.2], [9.0], [11.1]]), regressor._predict([[7.2], [9.0], [11.1]]), 0.01)
 
+	var drawing_path = "user://dtda_ml_test_tree_draw.json"
+	drawing._save(drawing_path)
+	var drawing_back = DTDATree.new()
+	drawing_back._load(drawing_path)
+	t.check_equal("max_features comes back from the file", drawing_back.max_features, 2)
+
 	t.section("Decision tree guards (the errors below are expected)")
 	t.check_empty("_predict before _fit", DTDATree.new()._predict([[1]]))
 	t.check_equal("_save before _fit fails", DTDATree.new()._save(path), false)
@@ -114,3 +162,11 @@ func _run(t):
 	var other_path = "user://dtda_ml_test_not_a_tree.json"
 	other._save(other_path)
 	t.check_equal("_load refuses another kind of model", DTDATree.new()._load(other_path), false)
+	# a model file lives in user://, where it can be edited by hand, and DTDAForest
+	# hands whole subtrees straight to _from_dict()
+	var handmade = "user://dtda_ml_test_tree_handmade.json"
+	var handmade_file = FileAccess.open(handmade, FileAccess.WRITE)
+	handmade_file.store_string('{"model": "DTDATree", "version": 1, "root": "not a node"}')
+	handmade_file.close()
+	t.check_equal("_load refuses a tree whose root is not a node",
+		DTDATree.new()._load(handmade), false)
