@@ -1,7 +1,7 @@
 # MLTools helpers, metrics and DTDAScaler.
 
 # how many assertions this suite runs, checked by the runner
-const PLAN = 43
+const PLAN = 64
 
 func _run(t):
 	var ml = MLTools.new()
@@ -105,6 +105,63 @@ func _run(t):
 	var reused = DTDAScaler.new(DTDAScaler.MINMAX)
 	reused._fit(raw)
 	t.check_near_array("_transform reuses the learned scaling", reused._transform([[5.0, 500.0]])[0], [1.0, 1.0])
+
+	t.section("MLTools, numbers read out of a file")
+	# what a model reads out of user:// has to be usable, not merely present
+	t.check_equal("a list of numbers is a list of numbers",
+		ml._check_number_array([1, 2.5], "M", "weights"), true)
+	t.check_equal("a text is not a list", ml._check_number_array("nope", "M", "weights"), false)
+	t.check_equal("a null is not a list either", ml._check_number_array(null, "M", "weights"), false)
+	t.check_equal("an empty list holds no number", ml._check_number_array([], "M", "weights"), false)
+	t.check_equal("a list holding a text is not a list of numbers",
+		ml._check_number_array([1.0, "nope"], "M", "weights"), false)
+	t.check_equal("a list holding a list is not one either",
+		ml._check_number_array([1.0, [2.0]], "M", "weights"), false)
+	t.check_equal("_check_number takes an int", ml._check_number(3, "M", "intercept"), true)
+	t.check_equal("_check_number takes a float", ml._check_number(3.5, "M", "intercept"), true)
+	t.check_equal("_check_number refuses a text", ml._check_number("3.5", "M", "intercept"), false)
+	t.check_equal("_check_number refuses a null", ml._check_number(null, "M", "intercept"), false)
+
+	t.section("DTDAScaler, reading a saved scaler")
+	# a scaler is written inside the file of the model that owns it, and that file
+	# lives in user:// where it can be edited by hand. What is read back has to be
+	# usable, not merely present: _transform() reads an offset and a scale per column
+	# and divides by the scale
+	var sound = DTDAScaler.new()
+	t.check_equal("a sound scaler is read back",
+		sound._from_dict({"mode": DTDAScaler.MINMAX, "offsets": [1.0], "scales": [2.0]}), true)
+	t.check_near_array("and scales with what it read", sound._transform([[5.0]])[0], [2.0])
+	# the same trap as the feature index of a tree: a mode read back from JSON is a
+	# float, and this one is compared against an enum
+	var moded = DTDAScaler.new()
+	moded._from_dict({"mode": 1.0, "offsets": [1.0], "scales": [2.0]})
+	t.check_equal("the mode comes back as an integer", typeof(moded.mode), TYPE_INT)
+
+	t.section("DTDAScaler, refusing a saved scaler (the errors below are expected)")
+	t.check_equal("offsets that are not a list",
+		DTDAScaler.new()._from_dict({"offsets": "nope", "scales": [1.0]}), false)
+	t.check_equal("scales that are not a list",
+		DTDAScaler.new()._from_dict({"offsets": [1.0], "scales": "nope"}), false)
+	t.check_equal("a scaler with nothing in it",
+		DTDAScaler.new()._from_dict({"offsets": [], "scales": []}), false)
+	t.check_equal("more offsets than scales",
+		DTDAScaler.new()._from_dict({"offsets": [1.0, 2.0], "scales": [1.0]}), false)
+	t.check_equal("an offset that is not a number",
+		DTDAScaler.new()._from_dict({"offsets": [1.0, "nope"], "scales": [1.0, 2.0]}), false)
+	# "2.5" and not "nope": float("nope") is 0.0, so the guard on the zero below would
+	# answer for it and this assertion would not name the guard it claims
+	t.check_equal("a scale that is not a number",
+		DTDAScaler.new()._from_dict({"offsets": [1.0, 2.0], "scales": [1.0, "2.5"]}), false)
+	# this one used to load and answer inf at the first prediction, without an error
+	t.check_equal("a scale of zero, which _transform would divide by",
+		DTDAScaler.new()._from_dict({"offsets": [1.0], "scales": [0.0]}), false)
+	# and a refused dictionary must not take the standing scaler down with it
+	var standing = DTDAScaler.new()
+	standing._fit([[0.0], [10.0]])
+	var standing_before = standing._transform([[5.0]])
+	standing._from_dict({"offsets": [99.0], "scales": [0.0]})
+	t.check_near_array("a refused scaler leaves the standing one alone",
+		standing._transform([[5.0]])[0], standing_before[0])
 
 	t.section("DTDAScaler guard (the error below is expected)")
 	t.check_empty("_transform before _fit returns an empty array", DTDAScaler.new()._transform([[1.0]]))

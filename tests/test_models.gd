@@ -43,7 +43,7 @@ func _scale_rows(rows, factor):
 	return scaled
 
 # how many assertions this suite runs, checked by the runner
-const PLAN = 29
+const PLAN = 59
 
 # write a handmade file and hand it to a model, for the guards on the file itself
 func _load_written(content, model):
@@ -108,7 +108,7 @@ func _run(t):
 	# without standardization exp() overflows here
 	var big_log = DTDALogReg.new(0.01, 1000)
 	big_log._fit(_scale_rows(X_log, 1000), y_log)
-	t.check_near_array("features x1000 give the same classes",
+	t.check_near_array("LogReg on features x1000 gives the same classes",
 		big_log._predict(_scale_rows(CLASS_TEST, 1000)), [0, 1, 1])
 
 	t.section("SVM")
@@ -117,7 +117,7 @@ func _run(t):
 	t.check_near_array("predicts -1 and 1", svm._predict(CLASS_TEST), [-1, 1, 1])
 	var big_svm = DTDASVM.new(0.01, 0.01, 1000)
 	big_svm._fit(_scale_rows(X_log, 1000), y_log)
-	t.check_near_array("features x1000 give the same classes",
+	t.check_near_array("SVM on features x1000 gives the same classes",
 		big_svm._predict(_scale_rows(CLASS_TEST, 1000)), [-1, 1, 1])
 
 	t.section("Saving and loading")
@@ -130,8 +130,11 @@ func _run(t):
 
 	var knn_path = "user://dtda_ml_test_knn.json"
 	t.check("KNN saves", knn._save(knn_path))
-	var knn_back = DTDAKNN.new(3)
+	# built with a different count on purpose: a receiver already holding 3 would load
+	# the same 3 whether _from_dict assigns it or not, and the field would go unpinned
+	var knn_back = DTDAKNN.new(1)
 	t.check("KNN loads", knn_back._load(knn_path))
+	t.check_equal("a reloaded KNN takes the neighbour count from the file", knn_back.num_neighbors, 3)
 	t.check_near_array("a reloaded KNN predicts the same", knn_back._predict(CLASS_TEST), knn._predict(CLASS_TEST))
 
 	t.section("Persistence guards (the errors below are expected)")
@@ -159,6 +162,109 @@ func _run(t):
 	t.check_equal("DTDASVM refuses a file that only lies about its model name",
 		_load_written('{"model": "NotASVM", "version": 1, "lr": 0.01, "lambda": 0.01, "iter": 10, "W": [1.0], "b": 0.0, "scaler": {"mode": 0, "offsets": [0.0], "scales": [1.0]}}',
 			DTDASVM.new(0.01, 0.01, 1000)), false)
+
+	t.section("Persistence, a refused file changes nothing (the errors below are expected)")
+	# A scaler that holds a zero divides by it at the first prediction. That file used
+	# to load with a success and answer inf, and the three models below wrote the
+	# weights of a file they went on to refuse over the ones they were working with.
+	var zero_x = '"x_scaler": {"mode": 0, "offsets": [0.0], "scales": [0.0]}, "y_scaler": {"mode": 0, "offsets": [0.0], "scales": [1.0]}'
+	var zero_s = '"scaler": {"mode": 0, "offsets": [0.0], "scales": [0.0]}'
+
+	var linreg_before = linreg._predict([[7.2], [9.0], [11.1]])
+	t.check_equal("LinReg refuses a file whose scaler holds a zero scale",
+		_load_written('{"model": "DTDALinReg", "version": 1, "rate": 0.5, "iterations": 3, "W": [9.9], "b": 7.7, ' + zero_x + '}',
+			linreg), false)
+	t.check_near_array("and LinReg predicts what it predicted before",
+		linreg._predict([[7.2], [9.0], [11.1]]), linreg_before, 0.001)
+
+	var logreg_before = logreg._predict(CLASS_TEST)
+	t.check_equal("LogReg refuses a file whose scaler holds a zero scale",
+		_load_written('{"model": "DTDALogReg", "version": 1, "rate": 0.5, "iterations": 3, "W": [9.9], "b": 7.7, ' + zero_s + '}',
+			logreg), false)
+	t.check_near_array("and LogReg predicts what it predicted before",
+		logreg._predict(CLASS_TEST), logreg_before)
+
+	var svm_before = svm._predict(CLASS_TEST)
+	t.check_equal("SVM refuses a file whose scaler holds a zero scale",
+		_load_written('{"model": "DTDASVM", "version": 1, "lr": 0.5, "lambda": 0.5, "iter": 3, "W": [9.9], "b": 7.7, ' + zero_s + '}',
+			svm), false)
+	t.check_near_array("and SVM predicts what it predicted before",
+		svm._predict(CLASS_TEST), svm_before)
+	# and no hyperparameter of the refused file either: each of the three was built
+	# with a rate of 0.01 and 1000 rounds, the refused files carry 0.5 and 3
+	t.check_equal("no scrap of the refused file is left behind",
+		[linreg.rate, logreg.iterations, svm.iter], [0.01, 1000, 1000])
+
+	t.section("Persistence, weights read out of a file (the errors below are expected)")
+	# _predict() computes with every one of these numbers, so a file that holds a text
+	# or an empty list where the weights belong is not usable. It used to load: with a
+	# text _load answered null after a cascade, with a list of the wrong shape it
+	# answered true and the model was ruined either way
+	t.check_equal("LinReg refuses weights that are not a list",
+		_load_written('{"model": "DTDALinReg", "version": 1, "W": "nope", ' + '"x_scaler": {"mode": 0, "offsets": [0.0], "scales": [1.0]}, "y_scaler": {"mode": 0, "offsets": [0.0], "scales": [1.0]}' + '}', DTDALinReg.new(0.01, 1000)), false)
+	t.check_equal("LinReg refuses an empty list of weights",
+		_load_written('{"model": "DTDALinReg", "version": 1, "W": [], ' + '"x_scaler": {"mode": 0, "offsets": [0.0], "scales": [1.0]}, "y_scaler": {"mode": 0, "offsets": [0.0], "scales": [1.0]}' + '}', DTDALinReg.new(0.01, 1000)), false)
+	t.check_equal("LinReg refuses weights holding something that is not a number",
+		_load_written('{"model": "DTDALinReg", "version": 1, "W": [1.0, "nope"], ' + '"x_scaler": {"mode": 0, "offsets": [0.0], "scales": [1.0]}, "y_scaler": {"mode": 0, "offsets": [0.0], "scales": [1.0]}' + '}', DTDALinReg.new(0.01, 1000)), false)
+	t.check_equal("LinReg refuses an intercept that is not a number",
+		_load_written('{"model": "DTDALinReg", "version": 1, "W": [1.0], "b": "nope", ' + '"x_scaler": {"mode": 0, "offsets": [0.0], "scales": [1.0]}, "y_scaler": {"mode": 0, "offsets": [0.0], "scales": [1.0]}' + '}', DTDALinReg.new(0.01, 1000)), false)
+	t.check_equal("LogReg refuses weights that are not a list",
+		_load_written('{"model": "DTDALogReg", "version": 1, "W": {"a": 1}, ' + '"scaler": {"mode": 0, "offsets": [0.0], "scales": [1.0]}' + '}', DTDALogReg.new(0.01, 1000)), false)
+	t.check_equal("LogReg refuses an intercept that is not a number",
+		_load_written('{"model": "DTDALogReg", "version": 1, "W": [1.0], "b": "nope", ' + '"scaler": {"mode": 0, "offsets": [0.0], "scales": [1.0]}' + '}', DTDALogReg.new(0.01, 1000)), false)
+	t.check_equal("SVM refuses weights that are not a list",
+		_load_written('{"model": "DTDASVM", "version": 1, "W": 5, ' + '"scaler": {"mode": 0, "offsets": [0.0], "scales": [1.0]}' + '}', DTDASVM.new(0.01, 0.01, 1000)), false)
+	t.check_equal("SVM refuses an intercept that is not a number",
+		_load_written('{"model": "DTDASVM", "version": 1, "W": [1.0], "b": "nope", ' + '"scaler": {"mode": 0, "offsets": [0.0], "scales": [1.0]}' + '}', DTDASVM.new(0.01, 0.01, 1000)), false)
+
+	t.section("Persistence, a refused file changes nothing (the errors below are expected)")
+	# The invariant, and it must not hang on one door. The files below carry a sound
+	# scaler and are refused for their weights alone, where the ones further down are
+	# refused for a scaler holding a zero. Both have to leave the model untouched
+	var linreg_weights = linreg._predict([[7.2], [9.0], [11.1]])
+	t.check_equal("a file with unusable weights is refused",
+		_load_written('{"model": "DTDALinReg", "version": 1, "rate": 0.5, "iterations": 3, "W": ["nope"], "b": 7.7, ' + '"x_scaler": {"mode": 0, "offsets": [0.0], "scales": [1.0]}, "y_scaler": {"mode": 0, "offsets": [0.0], "scales": [1.0]}' + '}',
+			linreg), false)
+	t.check_near_array("and LinReg predicts what it predicted before that one",
+		linreg._predict([[7.2], [9.0], [11.1]]), linreg_weights, 0.001)
+	var logreg_weights = logreg._predict(CLASS_TEST)
+	t.check_equal("a file with an unusable intercept is refused",
+		_load_written('{"model": "DTDALogReg", "version": 1, "iterations": 3, "W": [9.9], "b": "nope", ' + '"scaler": {"mode": 0, "offsets": [0.0], "scales": [1.0]}' + '}',
+			logreg), false)
+	t.check_near_array("and LogReg predicts what it predicted before that one",
+		logreg._predict(CLASS_TEST), logreg_weights)
+	var svm_weights = svm._predict(CLASS_TEST)
+	t.check_equal("a file with an empty list of weights is refused",
+		_load_written('{"model": "DTDASVM", "version": 1, "iter": 3, "W": [], "b": 7.7, ' + '"scaler": {"mode": 0, "offsets": [0.0], "scales": [1.0]}' + '}',
+			svm), false)
+	t.check_near_array("and SVM predicts what it predicted before that one",
+		svm._predict(CLASS_TEST), svm_weights)
+
+	t.section("Persistence, a KNN training set read out of a file (the errors below are expected)")
+	# a KNN answers with the rows it kept, so those rows have to be rows of numbers.
+	# A training set that is a text used to load with a success and only fall apart at
+	# the first prediction. The labels are left alone, a KNN answers them as they come
+	var knn_before = knn._predict(CLASS_TEST)
+	# two files rather than one holding two texts: with both fields wrong, either half
+	# of the check answers for the other and neither assertion names its own guard
+	t.check_equal("KNN refuses training rows that are not a list",
+		_load_written('{"model": "DTDAKNN", "version": 1, "num_neighbors": 1, "X": "nope", "Y": [3]}', knn), false)
+	t.check_equal("KNN refuses labels that are not a list",
+		_load_written('{"model": "DTDAKNN", "version": 1, "num_neighbors": 1, "X": [[0]], "Y": "nope"}', knn), false)
+	t.check_equal("KNN refuses an empty training set",
+		_load_written('{"model": "DTDAKNN", "version": 1, "num_neighbors": 1, "X": [], "Y": []}', knn), false)
+	t.check_equal("KNN refuses more rows than labels",
+		_load_written('{"model": "DTDAKNN", "version": 1, "num_neighbors": 1, "X": [[0], [1]], "Y": [3]}', knn), false)
+	t.check_equal("KNN refuses a row that is not a row of numbers",
+		_load_written('{"model": "DTDAKNN", "version": 1, "num_neighbors": 1, "X": [[0], ["nope"]], "Y": [3, 4]}', knn), false)
+	# the neighbour count is read at every prediction, not at _fit(): a text used to
+	# load with a success and answer null, a count of zero a list of nulls
+	t.check_equal("KNN refuses a neighbour count that is not a number",
+		_load_written('{"model": "DTDAKNN", "version": 1, "num_neighbors": "nope", "X": [[0]], "Y": [3]}', knn), false)
+	t.check_equal("KNN refuses a neighbour count below one",
+		_load_written('{"model": "DTDAKNN", "version": 1, "num_neighbors": 0, "X": [[0]], "Y": [3]}', knn), false)
+	t.check_near_array("and none of those refusals moved it",
+		knn._predict(CLASS_TEST), knn_before)
 
 	t.section("Fit guards (the errors below are expected)")
 	t.check_empty("KNN _predict before _fit", DTDAKNN.new(3)._predict([[1]]))

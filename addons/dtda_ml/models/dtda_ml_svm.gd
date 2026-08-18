@@ -75,16 +75,27 @@ func _to_dict():
 func _from_dict(data):
 	if not _check_model_name(data, "DTDASVM"):
 		return false
+	# Everything is read aside first and only takes the place of the standing model
+	# once the whole file is known to be readable. Assigning as it went used to leave
+	# a working model with the weights of a file it had just refused
+	# absent, malformed and unusable answer the same way: a null is not a list either,
+	# and _predict() computes with every one of these numbers
+	var saved_W = data.get("W")
+	if not _check_number_array(saved_W, "DTDASVM", "weights"):
+		return false
+	var saved_b = data.get("b", 0)
+	if not _check_number(saved_b, "DTDASVM", "intercept"):
+		return false
+	var saved_scaler = DTDAScaler.new()
+	if not saved_scaler._from_dict(data.get("scaler", {})):
+		return false
 	lr = data.get("lr", lr)
 	lambda = data.get("lambda", lambda)
 	iter = data.get("iter", iter)
-	W = data.get("W")
-	b = data.get("b", 0)
-	if W == null:
-		push_error("DTDASVM: the saved model has no weights")
-		return false
+	W = saved_W
+	b = saved_b
 	n = W.size()
-	scaler = DTDAScaler.new()
-	return scaler._from_dict(data.get("scaler", {}))
+	scaler = saved_scaler
+	return true
 
 # === End SVM model === #

@@ -101,6 +101,12 @@ Example:
 Every model can be written to a JSON file and read back, so you can train once and ship the weights with your game instead of retraining at every launch.
 _save(path) returns true on success, _load(path) fills a model you just created. Both report a clear error and return false on failure, and _load() refuses a file holding a different kind of model.
 
+A file lives in user://, where a player can edit it, so _load() checks what it reads before believing it. What is checked is what a prediction computes with: the weights and the intercept of a regression or an SVM, the neighbour count and the training rows of a KNN, the offsets and scales of a scaler, the list of trees of a forest, the q values of an agent. A text where a number belongs, a list that is empty or shorter than the one it goes with, a scale of zero that every prediction would divide by, a neighbour count below one: each of those answers false with an error.
+
+What is not checked, and it is worth knowing: the inside of a decision tree. _load() makes sure the root is a node, then takes the branches as they come, so a tree whose nodes have been rewritten by hand can load and answer nonsense without complaining. Neither is the mode of a forest, which every prediction reads to decide between a vote and a mean: a text there is read as a vote, so a regression forest can come back answering like a classifier, and it does so in silence. Neither are the settings only _fit() reads, such as the learning rate or the number of rounds: a wrong one there costs nothing until you train again.
+
+A file that is refused changes nothing, in any of the seven models: one that was working goes on working, with the weights and the settings it already had.
+
 Use a user:// path: res:// is read only once the game is exported.
 
 Example:
