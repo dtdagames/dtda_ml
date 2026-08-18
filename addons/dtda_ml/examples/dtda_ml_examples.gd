@@ -44,6 +44,7 @@ func _ready():
 	_logreg_example()
 	_svm_example()
 	_tree_example()
+	_qlearning_example()
 	_scaler_example()
 	_metrics_example()
 	_persistence_example()
@@ -148,6 +149,63 @@ func _tree_example():
 	var xor_tree = DTDATree.new(4, 2, DTDATree.CLASSIFIER)
 	xor_tree._fit(xor_X, xor_y)
 	print("Tree on a XOR: ", xor_tree._predict(xor_X), " expected ", xor_y)
+
+# a corridor of six rooms: room 0 is a pit, room 5 is the exit, the agent starts in room 3
+# it learns by playing, there is no training set here
+const CORRIDOR_ACTIONS = ["left", "right"]
+const CORRIDOR_PIT = 0
+const CORRIDOR_EXIT = 5
+const CORRIDOR_START = 3
+
+# returns [next room, reward, episode over]
+func _corridor_step(room, action):
+	var next_room = clamp(room + (1 if action == "right" else -1), CORRIDOR_PIT, CORRIDOR_EXIT)
+	if next_room == CORRIDOR_EXIT:
+		return [next_room, 1.0, true]
+	if next_room == CORRIDOR_PIT:
+		return [next_room, -1.0, true]
+	return [next_room, 0.0, false]
+
+func _qlearning_example():
+	var agent = DTDAQLearning.new(0.2, 0.9, 1.0, 0.99, 0.05)
+	# a fixed seed so this example prints the same run every time
+	agent._set_seed(1)
+
+	for episode in 500:
+		var room = CORRIDOR_START
+		# a bounded episode, a random walk could otherwise wander for a long time
+		for step in 100:
+			var action = agent._choose_action(room, CORRIDOR_ACTIONS)
+			var result = _corridor_step(room, action)
+			agent._learn(room, action, result[1], result[0], CORRIDOR_ACTIONS, result[2])
+			room = result[0]
+			if result[2]:
+				break
+		# one notch less exploration, never below the floor
+		agent._decay_exploration()
+
+	print("Q-Learning exploration left: ", agent.exploration_rate)
+	# the policy, with no exploration at all: every room walks away from the pit
+	for room in range(1, CORRIDOR_EXIT):
+		print("Q-Learning room ", room, ": ", agent._predict(room),
+			" (left ", snapped(agent._get_q(room, "left"), 0.001),
+			", right ", snapped(agent._get_q(room, "right"), 0.001), ")")
+
+	# playing the learned policy, which should reach the exit in two moves
+	var path = [CORRIDOR_START]
+	var current = CORRIDOR_START
+	for step in 10:
+		var move = agent._predict(current, CORRIDOR_ACTIONS)
+		# _predict() answers null on a room the agent never visited, where it has
+		# nothing to say: in a real game that is where you fall back on your own default
+		if move == null:
+			break
+		var result = _corridor_step(current, move)
+		current = result[0]
+		path.push_back(current)
+		if result[2]:
+			break
+	print("Q-Learning path from room ", CORRIDOR_START, ": ", path)
 
 # the models scale their features on their own, use DTDAScaler for your own data
 func _scaler_example():

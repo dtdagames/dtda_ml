@@ -20,6 +20,9 @@ const DATA_LOGR = [
 	[2, 2, 4, 0, 1, 1, 1],
 ]
 
+# how many assertions this suite runs, checked by the runner
+const PLAN = 19
+
 func _run(t):
 	var ml = MLTools.new()
 
@@ -104,10 +107,10 @@ func _run(t):
 
 	t.section("Decision tree guards (the errors below are expected)")
 	t.check_empty("_predict before _fit", DTDATree.new()._predict([[1]]))
-	t.check("_save before _fit fails", not DTDATree.new()._save(path))
+	t.check_equal("_save before _fit fails", DTDATree.new()._save(path), false)
 	# a file written by another model, saved here so this suite stays self contained
 	var other = DTDAKNN.new(1)
 	other._fit([[0]], [1])
 	var other_path = "user://dtda_ml_test_not_a_tree.json"
 	other._save(other_path)
-	t.check("_load refuses another kind of model", not DTDATree.new()._load(other_path))
+	t.check_equal("_load refuses another kind of model", DTDATree.new()._load(other_path), false)

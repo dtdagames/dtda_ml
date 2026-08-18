@@ -4,14 +4,15 @@
 DTDA ML allows you to run machine learning models like KNN, Linear Regression, Logistic Regression, SVM
 
 
-5 models are currently available:
+6 models are currently available:
 - KNN
 - Linear Regression
 - Logistic Regression
 - SVM
 - Decision Tree
+- Q-Learning
 
-All of them can be scored with the usual metrics, and saved to a JSON file to be reloaded later.
+The five supervised ones can be scored with the usual metrics, and every model can be saved to a JSON file to be reloaded later.
 
 
 === Running the tests ===
@@ -21,8 +22,14 @@ The repository is also a small Godot project, so you can open it directly and pr
 The test suite lives in tests/ and needs no framework. Run it headless from the project root:
 - godot --headless --script res://tests/run_tests.gd
 
-It prints one line per failure and ends with a count, exiting with 0 when everything passes. Some tests exercise the guards of the addon on purpose, so the output contains expected "MLTools: ..." errors: only the FAIL lines and the final count matter.
+It prints one line per failure and ends with a count, exiting with 0 when everything passes. Some tests exercise the guards of the addon on purpose, so the output contains expected "MLTools: ..." errors: those are not failures.
 The same command runs on every push and pull request, against several Godot versions.
+
+Writing a test, two rules that keep the count honest:
+- every suite declares "const PLAN = N", the number of assertions it runs. The runner compares it to what it recorded and fails on a mismatch. Add a test, bump the number: the runner tells you which one to write. This is what catches a suite dying halfway through, which would otherwise just show up as a smaller count that nobody reads
+- prefer check_equal(name, call(), false) over check(name, not call()). A call that raises a GDScript error answers null, and "not null" is true, so the weak form turns a crash into a pass
+
+check_near() and check_near_array() answer a FAIL when they are handed something that is not a number, rather than letting abs() raise: a model regressed to null is a failure, not a missing line.
 
 === MLTools features ===
 
@@ -176,3 +183,49 @@ Example:
 - print("Tree prediction: ", tree._predict(X_test))
 - var regressor = DTDATree.new(3, 2, DTDATree.REGRESSOR) #same model, on a continuous target
 - regressor._fit(X_train, y_train)
+
+=== Q-Learning Model ===
+
+Use DTDAQLearning.new() to create a new agent. This one is not trained on a dataset: it learns while playing, from the transitions you feed it. It is the model to reach for when you want an NPC that gets better at something instead of a classifier over a CSV.
+
+DTDAQLearning.new(learning_rate, discount_factor, exploration_rate, exploration_decay, min_exploration_rate) takes:
+- learning_rate : how much a single transition moves a value, 0.1 by default. Higher learns faster but is noisier
+- discount_factor : how much a future reward is worth compared to an immediate one, 0.9 by default. Close to 0 the agent is greedy, close to 1 it plans ahead
+- exploration_rate : epsilon, the share of moves taken at random rather than greedily, 1.0 by default so the agent starts by trying everything
+- exploration_decay : what epsilon is multiplied by at the end of each episode, 0.99 by default
+- min_exploration_rate : the floor epsilon never goes below, 0.01 by default, so the agent keeps a little curiosity
+
+Epsilon is a probability: the rate and its floor are brought into [0, 1] when the agent is built, and _decay_exploration() keeps epsilon in [min_exploration_rate, 1] whatever decay you give it. Nothing else is validated: a discount_factor of 1 or more diverges on a looping world, that one is on you.
+
+The loop:
+- _choose_action(state, valid_actions) : epsilon-greedy, picks among the actions that are legal right now. Safe to call before anything was learned, the agent then simply explores. On a state it never met every action is worth 0, so the first of the list comes out
+- _learn(state, action, reward, next_state, next_actions, done) : one transition, the Bellman update Q(s, a) += lr * (reward + gamma * max Q(s', a') - Q(s, a)). Pass done = true on the last transition of an episode, a terminal state has no future to add. next_actions restricts what the agent may do next, leave it out (or pass null) to look at everything already learned about next_state
+- _decay_exploration() : call it at the end of an episode, epsilon goes down one notch and never below its floor
+- _predict(state, valid_actions) : the learned policy with no exploration at all, this is what you ship. valid_actions is optional, leave it out (or pass null) to pick among everything learned in that state. On a state the agent never met, or one whose row holds no action, it reports an error and answers null, with or without a list: it will not dress up a tie between zeros as a policy. Use _choose_action() when you need a move no matter what
+- _get_q(state, action) : the value of a pair, 0.0 when it was never met
+- _set_seed(value) : fix the random draws for a reproducible run
+- _reset() : forget the table, put epsilon back where it started and replay the seed given to _set_seed()
+
+States and actions can be anything, they are not assumed to be contiguous integers: a Vector2i tile, a string, a dictionary key. Both are stored by their str(), which is also what a JSON object needs, so a saved agent comes back keyed exactly the same way. An action is answered back with its own type for int, float, bool, String and StringName.
+
+What keying by str() costs, in exchange:
+- two values with the same str() are the same key: the integer 1 and the string "1" share a row, and inside one state the integer 2 and the string "2" share a cell. Use one spelling per state and per action
+- which pairs collide follows the number formatting of the engine, and that moves between versions: str(2.0) prints "2" up to Godot 4.3 and "2.0" from 4.4 on, so a whole float and an integer are one key on 4.3 and two different ones on 4.4. Do not rely on either behaviour
+- across two states, colliding actions keep their own values but not their type: the type of an action is remembered once for the whole agent, so the last one learned decides what _predict() hands back everywhere
+- a float key goes through str(), which may not carry every digit of a double: depending on the engine version, 1.0/3.0 comes back exactly or a hair off. Quantize a continuous state, a position for instance, rather than rely on either
+- for the same reason, a file holding float keys is tied to the engine it was written on: an agent saved on 4.3 with the state 2.0 wrote the key "2", which 4.4 spells "2.0" and would no longer find. Integer and string keys are unaffected
+
+A saved agent carries the version of the format it was written in, and _load() refuses anything else rather than reading it wrong.
+
+Example:
+- var agent = DTDAQLearning.new(0.2, 0.9, 1.0, 0.999, 0.1)
+- for episode in 1000:
+-     var state = start_state
+-     while not done:
+-         var action = agent._choose_action(state, ["left", "right"])
+-         #play the action, get the reward and the next state from your game
+-         agent._learn(state, action, reward, next_state, ["left", "right"], done)
+-         state = next_state
+-     agent._decay_exploration()
+- agent._save("user://agent.json")
+- print("Best move: ", agent._predict(state)) #no exploration left, the learned policy

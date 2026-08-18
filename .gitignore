@@ -1,3 +1,10 @@
+# Outillage local : agents Claude Code, hooks, et le verdict de revue technique.
+# Volontairement hors du depot. Cet addon se distribue en copiant addons/, et un
+# settings.json versionne ferait heriter a quiconque clone un hook qui execute un
+# script local. Le verdict, lui, doit rester ignore de toute facon : l'ecrire
+# modifierait l'empreinte du diff qu'il approuve.
+.claude/
+
 # Godot generates these on first import, they are machine specific
 .godot/
 .import/
