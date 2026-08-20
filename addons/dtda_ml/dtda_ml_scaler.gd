@@ -7,19 +7,19 @@ class_name DTDAScaler
 # MINMAX brings each column into the [0, 1] range
 enum { STANDARD, MINMAX }
 
-var mode
+var mode: int
 # each column is scaled as (value - offset) / scale
 var offsets
 var scales
 
-func _init(scaler_mode := STANDARD):
+func _init(scaler_mode: int = STANDARD) -> void:
 	mode = scaler_mode
 
 # learn the offset and the scale of every column
-func fit(X):
+func fit(X) -> bool:
 	if X.size() == 0:
 		push_error("DTDAScaler: fit() called with no data")
-		return
+		return false
 	offsets = []
 	scales = []
 	for column in _transpose_array(X):
@@ -36,33 +36,34 @@ func fit(X):
 			offsets.push_back(_mean_array(column))
 			# _std_array already returns 1.0 on a constant column
 			scales.push_back(_std_array(column))
+	return true
 
-func transform(X):
+func transform(X) -> Array:
 	if not _check_fitted("DTDAScaler", offsets, "transform()"):
 		return []
-	var matrix = []
+	var matrix: Array = []
 	for i in X.size():
 		matrix.push_back([])
 		for u in X[i].size():
 			matrix[i].push_back((X[i][u] - offsets[u]) / scales[u])
 	return matrix
 
-func fit_transform(X):
+func fit_transform(X) -> Array:
 	fit(X)
 	return transform(X)
 
 # back to the unit of the data the scaler was fitted on
-func inverse_transform(X):
+func inverse_transform(X) -> Array:
 	if not _check_fitted("DTDAScaler", offsets, "inverse_transform()"):
 		return []
-	var matrix = []
+	var matrix: Array = []
 	for i in X.size():
 		matrix.push_back([])
 		for u in X[i].size():
 			matrix[i].push_back(X[i][u] * scales[u] + offsets[u])
 	return matrix
 
-func to_dict():
+func to_dict() -> Dictionary:
 	return {
 		"mode": mode,
 		"offsets": offsets,
@@ -76,7 +77,7 @@ func to_dict():
 # can be edited by hand.
 # Nothing is written into the scaler until the whole dictionary has been read, so a
 # refused one leaves a working scaler exactly as it was
-func from_dict(data):
+func from_dict(data) -> bool:
 	var saved_offsets = data.get("offsets")
 	var saved_scales = data.get("scales")
 	if typeof(saved_offsets) != TYPE_ARRAY or typeof(saved_scales) != TYPE_ARRAY:

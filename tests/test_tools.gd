@@ -1,7 +1,7 @@
 # MLTools helpers, metrics and DTDAScaler.
 
 # how many assertions this suite runs, checked by the runner
-const PLAN = 81
+const PLAN = 82
 
 func _run(t):
 	var ml = DTDATools.new()
@@ -197,4 +197,6 @@ func _run(t):
 		standing.transform([[5.0]])[0], standing_before[0])
 
 	t.section("DTDAScaler guard (the error below is expected)")
+	# the same answer as the eight models: false when it refused, true when it fitted
+	t.check_equal("fit with no data answers false", DTDAScaler.new().fit([]), false)
 	t.check_empty("_transform before _fit returns an empty array", DTDAScaler.new().transform([[1.0]]))

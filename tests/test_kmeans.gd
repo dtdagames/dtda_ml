@@ -1,7 +1,7 @@
 # DTDAKMeans, the k-means clustering.
 
 # how many assertions this suite runs, checked by the runner
-const PLAN = 59
+const PLAN = 62
 
 # a file this model reads from end to end, which every guard below breaks in exactly
 # one place: two fields wrong at once and either guard could be the one answering
@@ -145,6 +145,19 @@ func _run(t):
 		if not (first_on and second_on):
 			off_centre += 1
 	t.check_equal("every centre sits on the middle of what it holds", off_centre, 0)
+
+	# fit() works on rows packed into contiguous float arrays, which is faster on the
+	# inner loops and is not a type anything else here understands: a PackedFloat64Array
+	# is not an Array, typeof() answers differently, comparing the two raises, and
+	# _check_number_array() would turn one away. So what fit() leaves behind has to be
+	# a plain Array, and this is what says so
+	t.check_equal("the centres are a plain Array", typeof(km.centroids), TYPE_ARRAY)
+	var packed_rows = 0
+	for centre in km.centroids:
+		if typeof(centre) != TYPE_ARRAY:
+			packed_rows += 1
+	t.check_equal("and so is every centre in it", packed_rows, 0)
+	t.check_equal("so a fitted model still saves", km.save("user://dtda_ml_test_kmeans_packed.json"), true)
 
 	t.section("K-Means, the unit a column is written in")
 	# distances are euclidean, so without the scaler inside, a column multiplied by a

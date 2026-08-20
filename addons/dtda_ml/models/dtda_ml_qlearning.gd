@@ -42,25 +42,25 @@ const ACTION_TYPES = {
 	TYPE_STRING_NAME: "string_name",
 }
 
-var learning_rate
-var discount_factor
+var learning_rate: float
+var discount_factor: float
 # epsilon: the share of the moves taken at random rather than greedily
-var exploration_rate
-var exploration_decay
-var min_exploration_rate
+var exploration_rate: float
+var exploration_decay: float
+var min_exploration_rate: float
 # where the exploration started, so reset() puts the agent back as it was
-var start_exploration_rate
+var start_exploration_rate: float
 # {state key: {action key: q value}}, null until the first learn()
 var q_table
 # {action key: the action itself}, so the agent answers with what you passed it
 # it is global to the agent, not kept per state
 var actions_seen
 # its own generator, so a game can replay an identical run with set_seed()
-var rng
+var rng: RandomNumberGenerator
 # the seed given to set_seed(), replayed by reset(), null when none was asked for
 var start_seed
 
-func _init(q_learning_rate := 0.1, q_discount_factor := 0.9, q_exploration_rate := 1.0, q_exploration_decay := 0.99, q_min_exploration_rate := 0.01):
+func _init(q_learning_rate: float = 0.1, q_discount_factor: float = 0.9, q_exploration_rate: float = 1.0, q_exploration_decay: float = 0.99, q_min_exploration_rate: float = 0.01) -> void:
 	learning_rate = q_learning_rate
 	discount_factor = q_discount_factor
 	# epsilon and its floor are probabilities, they are brought into [0, 1] here
@@ -75,23 +75,23 @@ func _init(q_learning_rate := 0.1, q_discount_factor := 0.9, q_exploration_rate 
 
 # a JSON object only has string keys, so the table is keyed by str() from the start:
 # what is written is exactly what is read back
-func _key(value):
+func _key(value) -> String:
 	return str(value)
 
 # fix the random draws, for a reproducible training run
 # reset() puts the generator back on that same seed
-func set_seed(value):
+func set_seed(value: int) -> void:
 	start_seed = value
 	rng.seed = value
 
 # an omitted or null list of actions means "everything already known here"
-func _as_list(valid_actions):
+func _as_list(valid_actions) -> Array:
 	if valid_actions == null:
 		return []
 	return valid_actions
 
 # expected return of an action in a state, 0.0 when it was never met
-func get_q(state, action):
+func get_q(state, action) -> float:
 	if q_table == null:
 		return 0.0
 	var row = q_table.get(_key(state))
@@ -100,8 +100,8 @@ func get_q(state, action):
 	return row.get(_key(action), 0.0)
 
 # the actions already met in a state, in the order they were first learned
-func _known_actions(state):
-	var known = []
+func _known_actions(state) -> Array:
+	var known: Array = []
 	if q_table == null:
 		return known
 	var row = q_table.get(_key(state))
@@ -112,13 +112,13 @@ func _known_actions(state):
 	return known
 
 # best q value reachable from a state, 0.0 when nothing is known about it
-func _max_q(state, valid_actions = []):
+func _max_q(state, valid_actions = []) -> float:
 	var candidates = _as_list(valid_actions)
 	if candidates.is_empty():
 		candidates = _known_actions(state)
 	if candidates.is_empty():
 		return 0.0
-	var best = -INF
+	var best: float = -INF
 	for action in candidates:
 		var value = get_q(state, action)
 		if value > best:
@@ -130,7 +130,7 @@ func _max_q(state, valid_actions = []):
 # answer of an agent that knows nothing yet stays reproducible
 func _best_action(state, valid_actions):
 	var best = null
-	var best_value = -INF
+	var best_value: float = -INF
 	for action in valid_actions:
 		var value = get_q(state, action)
 		if value > best_value:
@@ -200,14 +200,14 @@ func predict(state, valid_actions = []):
 
 # call at the end of an episode: the agent explores a little less from now on
 # epsilon is a probability, it stays in [min_exploration_rate, 1] whatever the decay
-func decay_exploration():
+func decay_exploration() -> float:
 	exploration_rate = max(min_exploration_rate, exploration_rate * exploration_decay)
 	exploration_rate = clamp(exploration_rate, 0.0, 1.0)
 	return exploration_rate
 
 # forget everything learned and put the agent back where it started: the exploration
 # rate it was built with, and the seed it was given
-func reset():
+func reset() -> void:
 	q_table = null
 	actions_seen = {}
 	exploration_rate = start_exploration_rate
@@ -216,7 +216,7 @@ func reset():
 
 # an action goes out as its key plus the label of its type, so the integer 2 does not
 # come back as the string "2" or as the float 2.0
-func _actions_to_dict():
+func _actions_to_dict() -> Dictionary:
 	var types = {}
 	for action_key in actions_seen:
 		var type = typeof(actions_seen[action_key])
@@ -239,7 +239,7 @@ func _action_from_key(action_key, label):
 		_:
 			return action_key
 
-func to_dict():
+func to_dict() -> Dictionary:
 	if not _check_fitted("DTDAQLearning", q_table, "save()"):
 		return {}
 	return {
@@ -256,7 +256,7 @@ func to_dict():
 		"actions": _actions_to_dict(),
 	}
 
-func from_dict(data):
+func from_dict(data) -> bool:
 	if not _check_model_name(data, "DTDAQLearning"):
 		return false
 	# int() because a version read back from JSON carries as a float
@@ -312,7 +312,7 @@ func from_dict(data):
 # calls them breaks. They only forward. Prefer the ones without the underscore.
 
 func _set_seed(value):
-	return set_seed(value)
+	set_seed(value)
 
 func _get_q(state, action):
 	return get_q(state, action)
@@ -330,7 +330,7 @@ func _decay_exploration():
 	return decay_exploration()
 
 func _reset():
-	return reset()
+	reset()
 
 
 

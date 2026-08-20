@@ -13,21 +13,21 @@ enum { CLASSIFIER, REGRESSOR }
 # A forest whose trees each looked at every feature would grow the same tree over and
 # over, and averaging identical trees gains nothing.
 
-var m
-var n
-var mode
-var max_depth
-var min_samples_split
-var max_features
+var m: int = 0
+var n: int = 0
+var mode: int
+var max_depth: int
+var min_samples_split: int
+var max_features: int
 # its own generator, so a forest can hand each of its trees a reproducible stream
-var rng
+var rng: RandomNumberGenerator
 var X
 var Y
 # the tree itself, nested dictionaries of nodes
 # a branch holds feature/threshold/left/right, a leaf holds a single value
 var root
 
-func _init(tree_max_depth := 5, tree_min_samples_split := 2, tree_mode := CLASSIFIER, tree_max_features := 0):
+func _init(tree_max_depth: int = 5, tree_min_samples_split: int = 2, tree_mode: int = CLASSIFIER, tree_max_features: int = 0) -> void:
 	max_depth = tree_max_depth
 	min_samples_split = tree_min_samples_split
 	mode = tree_mode
@@ -36,22 +36,22 @@ func _init(tree_max_depth := 5, tree_min_samples_split := 2, tree_mode := CLASSI
 
 # fix the feature draws, for a reproducible tree. Pointless while max_features is 0,
 # where nothing is drawn
-func set_seed(value):
+func set_seed(value: int) -> void:
 	rng.seed = value
 
 # Gini impurity of the labels held by the given rows, 0.0 when they all agree
-func _gini(rows):
+func _gini(rows) -> float:
 	var counts = {}
 	for i in rows:
 		counts[Y[i]] = counts.get(Y[i], 0) + 1
-	var impurity = 1.0
+	var impurity: float = 1.0
 	for label in counts:
 		var p = float(counts[label]) / float(rows.size())
 		impurity -= p * p
 	return impurity
 
 # variance of the labels held by the given rows
-func _variance(rows):
+func _variance(rows) -> float:
 	var values = []
 	for i in rows:
 		values.push_back(Y[i])
@@ -61,7 +61,7 @@ func _variance(rows):
 		total += (value - mean)**2
 	return total / float(values.size())
 
-func _impurity(rows):
+func _impurity(rows) -> float:
 	if rows.size() == 0:
 		return 0.0
 	if mode == REGRESSOR:
@@ -69,7 +69,7 @@ func _impurity(rows):
 	return _gini(rows)
 
 # every midpoint between two consecutive distinct values of a feature
-func _candidate_thresholds(rows, feature):
+func _candidate_thresholds(rows, feature: int) -> Array:
 	var values = []
 	for i in rows:
 		values.push_back(X[i][feature])
@@ -81,15 +81,15 @@ func _candidate_thresholds(rows, feature):
 	return thresholds
 
 # the features a single split may look at, all of them in order by default
-func _features_for_split():
-	var every = []
+func _features_for_split() -> Array:
+	var every: Array = []
 	for feature in n:
 		every.push_back(feature)
 	# the default path draws nothing, so it stays identical run after run
 	if max_features <= 0 or max_features >= n:
 		return every
 	# without replacement, so no feature is weighed twice in the same split
-	var drawn = []
+	var drawn: Array = []
 	for i in max_features:
 		drawn.push_back(every.pop_at(rng.randi() % every.size()))
 	return drawn
@@ -97,13 +97,13 @@ func _features_for_split():
 # the split lowering the impurity the most, or an empty dictionary when none does
 # when max_features hides every usable feature from a node, that node finds nothing
 # and becomes a leaf. A lone tree keeps growing, only a forest can end up there
-func _best_split(rows):
+func _best_split(rows) -> Dictionary:
 	var parent = _impurity(rows)
 	var best = {}
 	# a split of gain 0 is still worth taking: on a XOR, no single feature helps at the
 	# root, yet each half becomes separable one level down. Only the absence of any
 	# usable threshold leaves this empty.
-	var best_gain = -1.0
+	var best_gain: float = -1.0
 	for feature in _features_for_split():
 		for threshold in _candidate_thresholds(rows, feature):
 			var left = []
@@ -157,7 +157,7 @@ func _build(rows, depth):
 		"right": _build(split["right"], depth + 1),
 	}
 
-func fit(newX, newY):
+func fit(newX, newY) -> bool:
 	# The rows are weighed before a single field is written: a fit that took them as
 	# they came would leave a working model holding a nan, or half rewritten by a
 	# raise in the middle. Answers false when it refuses, true when it fitted
@@ -191,7 +191,7 @@ func _predict_row(row):
 			node = node["right"]
 	return node["leaf"]
 
-func predict(newX):
+func predict(newX) -> Array:
 	if not _check_fitted("DTDATree", root):
 		return []
 	var pred = []
@@ -199,7 +199,7 @@ func predict(newX):
 		pred.push_back(_predict_row(newX[i]))
 	return pred
 
-func to_dict():
+func to_dict() -> Dictionary:
 	if not _check_fitted("DTDATree", root, "save()"):
 		return {}
 	return {
@@ -212,7 +212,7 @@ func to_dict():
 		"root": root,
 	}
 
-func from_dict(data):
+func from_dict(data) -> bool:
 	if not _check_model_name(data, "DTDATree"):
 		return false
 	# A model file lives in user://, where it can be edited by hand, and DTDAForest
@@ -240,7 +240,7 @@ func from_dict(data):
 # calls them breaks. They only forward. Prefer the ones without the underscore.
 
 func _set_seed(value):
-	return set_seed(value)
+	set_seed(value)
 
 func _fit(newX, newY):
 	return fit(newX, newY)

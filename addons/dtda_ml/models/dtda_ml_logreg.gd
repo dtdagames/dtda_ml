@@ -3,21 +3,21 @@ extends DTDATools
 class_name DTDALogReg
 
 # === Logistic Regression model === #
-var m
-var n
-var rate
-var iterations
+var m: int = 0
+var n: int = 0
+var rate: float
+var iterations: int
 var W
 var b
 var X
 var Y
 var scaler
 
-func _init(newRate:float, newIterations:int):
+func _init(newRate: float, newIterations: int) -> void:
 	rate = newRate
 	iterations = newIterations
 
-func _update_weights(i):
+func _update_weights(i: int) -> void:
 	var a = _sigmoid(X, W, b)
 	
 	# gradients
@@ -31,7 +31,7 @@ func _update_weights(i):
 	W = _substract_arrays(W, dWrate)
 	b = b - (rate * dB)
 
-func fit(newX, newY):
+func fit(newX, newY) -> bool:
 	# The rows are weighed before a single field is written: a fit that took them as
 	# they came would leave a working model holding a nan, or half rewritten by a
 	# raise in the middle. Answers false when it refuses, true when it fitted
@@ -55,7 +55,7 @@ func fit(newX, newY):
 		_update_weights(i)
 	return true
 
-func _sigmoid(newX, newW, newB):
+func _sigmoid(newX, newW, newB) -> Array:
 	# 1/(1 + e(-(x.dot(w) + b)
 	var dotXW = _dot_product(newX, newW)
 	var dotXWb = _add_arrays_const(dotXW, newB)
@@ -64,7 +64,7 @@ func _sigmoid(newX, newW, newB):
 	var expXWb1 = _add_arrays_const(expXWb, 1)
 	return _divide_inverse_array_coef(expXWb1, 1)
 
-func predict(newX):
+func predict(newX) -> Array:
 	if not _check_fitted("DTDALogReg", W):
 		return []
 	var Z = _sigmoid(scaler.transform(newX), W, b)
