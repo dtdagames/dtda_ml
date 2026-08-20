@@ -49,7 +49,7 @@ func _run(t):
 		t._near_array_reason([1, 2], [1, 3], 0.001) != "")
 	t.check("sizes that differ are a reason to fail",
 		t._near_array_reason([1], [1, 2], 0.001) != "")
-	# the exact shape of a _predict() that came back empty or null
+	# the exact shape of a predict() that came back empty or null
 	t.check("a null array lands as a failure", t._near_array_reason(null, [1, 2], 0.001) != "")
 	t.check("an array holding a null lands as a failure",
 		t._near_array_reason([1, null], [1, 2], 0.001) != "")

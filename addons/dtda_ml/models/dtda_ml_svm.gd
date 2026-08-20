@@ -1,4 +1,4 @@
-extends MLTools
+extends DTDATools
 
 class_name DTDASVM
 
@@ -17,7 +17,7 @@ func _init(learning_rate=0.01, lambda_param=0.01, n_iters=1000):
 	lambda = lambda_param
 	iter = n_iters
 
-func _fit(newX, newY):
+func fit(newX, newY):
 	# The rows are weighed before a single field is written: a fit that took them as
 	# they came would leave a working model holding a nan, or half rewritten by a
 	# raise in the middle. Answers false when it refuses, true when it fitted
@@ -33,7 +33,7 @@ func _fit(newX, newY):
 
 	# standardized features, the descent is unstable otherwise
 	scaler = DTDAScaler.new()
-	var X = scaler._fit_transform(newX)
+	var X = scaler.fit_transform(newX)
 	var y2 = _normalize_negative(newY)
 
 	# list zeros
@@ -62,15 +62,15 @@ func _fit(newX, newY):
 				b = b - (lr*y2[i])
 	return true
 
-func _predict(newX):
+func predict(newX):
 	if not _check_fitted("DTDASVM", W):
 		return []
-	var dotXW = _dot_product(scaler._transform(newX), W)
+	var dotXW = _dot_product(scaler.transform(newX), W)
 	var predY = _sub_arrays_const(dotXW, b)
 	return _sign_array(predY)
 
-func _to_dict():
-	if not _check_fitted("DTDASVM", W, "_save()"):
+func to_dict():
+	if not _check_fitted("DTDASVM", W, "save()"):
 		return {}
 	return {
 		"model": "DTDASVM",
@@ -80,17 +80,17 @@ func _to_dict():
 		"iter": iter,
 		"W": W,
 		"b": b,
-		"scaler": scaler._to_dict(),
+		"scaler": scaler.to_dict(),
 	}
 
-func _from_dict(data):
+func from_dict(data):
 	if not _check_model_name(data, "DTDASVM"):
 		return false
 	# Everything is read aside first and only takes the place of the standing model
 	# once the whole file is known to be readable. Assigning as it went used to leave
 	# a working model with the weights of a file it had just refused
 	# absent, malformed and unusable answer the same way: a null is not a list either,
-	# and _predict() computes with every one of these numbers
+	# and predict() computes with every one of these numbers
 	var saved_W = data.get("W")
 	if not _check_number_array(saved_W, "DTDASVM", "weights"):
 		return false
@@ -98,7 +98,7 @@ func _from_dict(data):
 	if not _check_number(saved_b, "DTDASVM", "intercept"):
 		return false
 	var saved_scaler = DTDAScaler.new()
-	if not saved_scaler._from_dict(data.get("scaler", {})):
+	if not saved_scaler.from_dict(data.get("scaler", {})):
 		return false
 	lr = data.get("lr", lr)
 	lambda = data.get("lambda", lambda)
@@ -108,5 +108,20 @@ func _from_dict(data):
 	n = W.size()
 	scaler = saved_scaler
 	return true
+
+
+# === The older names === #
+# Every method above used to carry a leading underscore, which in Godot marks a
+# method as virtual or private: the engine calls _ready() and _process(), you do not.
+# The names below are the ones that shipped, kept working so nothing that already
+# calls them breaks. They only forward. Prefer the ones without the underscore.
+
+func _fit(newX, newY):
+	return fit(newX, newY)
+
+func _predict(newX):
+	return predict(newX)
+
+
 
 # === End SVM model === #

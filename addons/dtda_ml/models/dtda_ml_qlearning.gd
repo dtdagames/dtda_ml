@@ -1,4 +1,4 @@
-extends MLTools
+extends DTDATools
 
 class_name DTDAQLearning
 
@@ -17,7 +17,7 @@ class_name DTDAQLearning
 #    and an integer are one key on 4.3 and two on 4.4. Use one spelling per action
 #  - across two states colliding actions keep their own q values, but not their type:
 #    it is remembered once for the whole agent, so the last one learned decides what
-#    _predict() hands back everywhere, in every state
+#    predict() hands back everywhere, in every state
 #  - a float key goes through str(), which may not carry every digit of a double:
 #    depending on the engine, 1.0/3.0 comes back exactly or a hair off. Quantize a
 #    continuous state, a position for instance, rather than rely on either
@@ -48,16 +48,16 @@ var discount_factor
 var exploration_rate
 var exploration_decay
 var min_exploration_rate
-# where the exploration started, so _reset() puts the agent back as it was
+# where the exploration started, so reset() puts the agent back as it was
 var start_exploration_rate
-# {state key: {action key: q value}}, null until the first _learn()
+# {state key: {action key: q value}}, null until the first learn()
 var q_table
 # {action key: the action itself}, so the agent answers with what you passed it
 # it is global to the agent, not kept per state
 var actions_seen
-# its own generator, so a game can replay an identical run with _set_seed()
+# its own generator, so a game can replay an identical run with set_seed()
 var rng
-# the seed given to _set_seed(), replayed by _reset(), null when none was asked for
+# the seed given to set_seed(), replayed by reset(), null when none was asked for
 var start_seed
 
 func _init(q_learning_rate := 0.1, q_discount_factor := 0.9, q_exploration_rate := 1.0, q_exploration_decay := 0.99, q_min_exploration_rate := 0.01):
@@ -79,8 +79,8 @@ func _key(value):
 	return str(value)
 
 # fix the random draws, for a reproducible training run
-# _reset() puts the generator back on that same seed
-func _set_seed(value):
+# reset() puts the generator back on that same seed
+func set_seed(value):
 	start_seed = value
 	rng.seed = value
 
@@ -91,7 +91,7 @@ func _as_list(valid_actions):
 	return valid_actions
 
 # expected return of an action in a state, 0.0 when it was never met
-func _get_q(state, action):
+func get_q(state, action):
 	if q_table == null:
 		return 0.0
 	var row = q_table.get(_key(state))
@@ -120,7 +120,7 @@ func _max_q(state, valid_actions = []):
 		return 0.0
 	var best = -INF
 	for action in candidates:
-		var value = _get_q(state, action)
+		var value = get_q(state, action)
 		if value > best:
 			best = value
 	return best
@@ -132,7 +132,7 @@ func _best_action(state, valid_actions):
 	var best = null
 	var best_value = -INF
 	for action in valid_actions:
-		var value = _get_q(state, action)
+		var value = get_q(state, action)
 		if value > best_value:
 			best = action
 			best_value = value
@@ -142,9 +142,9 @@ func _best_action(state, valid_actions):
 # time the best one known so far. This is the one that may answer on a state it never
 # met, which is the whole point of the first episode: every q value is 0, a tie, so the
 # first action of the list comes out
-func _choose_action(state, valid_actions):
+func choose_action(state, valid_actions):
 	if valid_actions == null or valid_actions.size() == 0:
-		push_error("DTDAQLearning: _choose_action() called without any valid action")
+		push_error("DTDAQLearning: choose_action() called without any valid action")
 		return null
 	# randf() lives in [0, 1), so an exploration_rate of 0.0 never explores
 	# and one of 1.0 always does
@@ -157,9 +157,9 @@ func _choose_action(state, valid_actions):
 # a terminal transition has no future, its target is the reward alone
 # next_actions restricts what the agent may do next, leave it out to look at
 # everything already known about next_state
-func _learn(state, action, reward, next_state, next_actions = [], done = false):
+func learn(state, action, reward, next_state, next_actions = [], done = false):
 	# the reward lands straight in the table and is compared against every other q
-	# value from then on. A nan there answers false to every comparison, so _predict()
+	# value from then on. A nan there answers false to every comparison, so predict()
 	# stops being able to name a best action for that state at all. Answers null when
 	# it refuses, and the cell keeps the value it had
 	if not _check_number(reward, "DTDAQLearning", "reward"):
@@ -180,34 +180,34 @@ func _learn(state, action, reward, next_state, next_actions = [], done = false):
 
 # the learned policy, without any exploration: the best action known for this state
 # valid_actions restricts the choice, leave it out to pick among everything learned there
-func _predict(state, valid_actions = []):
+func predict(state, valid_actions = []):
 	if not _check_fitted("DTDAQLearning", q_table):
 		return null
 	# a state never met has nothing to answer, whatever the actions offered: they would
 	# all be worth 0 and the first of the list would come out dressed as a learned
-	# policy. Use _choose_action() when you need a move no matter what
+	# policy. Use choose_action() when you need a move no matter what
 	if not q_table.has(_key(state)):
-		push_error("DTDAQLearning: _predict() knows nothing about the state '%s'" % _key(state))
+		push_error("DTDAQLearning: predict() knows nothing about the state '%s'" % _key(state))
 		return null
 	var candidates = _as_list(valid_actions)
 	if candidates.is_empty():
 		candidates = _known_actions(state)
 	# a row can be there and hold nothing, a file where a state was emptied by hand
 	if candidates.is_empty():
-		push_error("DTDAQLearning: _predict() knows no action for the state '%s'" % _key(state))
+		push_error("DTDAQLearning: predict() knows no action for the state '%s'" % _key(state))
 		return null
 	return _best_action(state, candidates)
 
 # call at the end of an episode: the agent explores a little less from now on
 # epsilon is a probability, it stays in [min_exploration_rate, 1] whatever the decay
-func _decay_exploration():
+func decay_exploration():
 	exploration_rate = max(min_exploration_rate, exploration_rate * exploration_decay)
 	exploration_rate = clamp(exploration_rate, 0.0, 1.0)
 	return exploration_rate
 
 # forget everything learned and put the agent back where it started: the exploration
 # rate it was built with, and the seed it was given
-func _reset():
+func reset():
 	q_table = null
 	actions_seen = {}
 	exploration_rate = start_exploration_rate
@@ -239,8 +239,8 @@ func _action_from_key(action_key, label):
 		_:
 			return action_key
 
-func _to_dict():
-	if not _check_fitted("DTDAQLearning", q_table, "_save()"):
+func to_dict():
+	if not _check_fitted("DTDAQLearning", q_table, "save()"):
 		return {}
 	return {
 		"model": "DTDAQLearning",
@@ -256,7 +256,7 @@ func _to_dict():
 		"actions": _actions_to_dict(),
 	}
 
-func _from_dict(data):
+func from_dict(data):
 	if not _check_model_name(data, "DTDAQLearning"):
 		return false
 	# int() because a version read back from JSON carries as a float
@@ -303,5 +303,35 @@ func _from_dict(data):
 	for action_key in types:
 		actions_seen[action_key] = _action_from_key(action_key, types[action_key])
 	return true
+
+
+# === The older names === #
+# Every method above used to carry a leading underscore, which in Godot marks a
+# method as virtual or private: the engine calls _ready() and _process(), you do not.
+# The names below are the ones that shipped, kept working so nothing that already
+# calls them breaks. They only forward. Prefer the ones without the underscore.
+
+func _set_seed(value):
+	return set_seed(value)
+
+func _get_q(state, action):
+	return get_q(state, action)
+
+func _choose_action(state, valid_actions):
+	return choose_action(state, valid_actions)
+
+func _learn(state, action, reward, next_state, next_actions = [], done = false):
+	return learn(state, action, reward, next_state, next_actions, done)
+
+func _predict(state, valid_actions = []):
+	return predict(state, valid_actions)
+
+func _decay_exploration():
+	return decay_exploration()
+
+func _reset():
+	return reset()
+
+
 
 # === End Q-Learning === #

@@ -37,7 +37,7 @@ var dataSVM = [
 ]
 
 func _ready():
-	mltools = MLTools.new()
+	mltools = DTDATools.new()
 	
 	_knn_example()
 	_linreg_example()
@@ -52,8 +52,8 @@ func _ready():
 	_persistence_example()
 
 func _knn_example():
-	var X_train = mltools._dropVariable(dataKNN, dataKNN[0].size()-1)
-	var y_train = mltools._getVariable(dataKNN, dataKNN[0].size()-1)
+	var X_train = mltools.drop_variable(dataKNN, dataKNN[0].size()-1)
+	var y_train = mltools.get_variable(dataKNN, dataKNN[0].size()-1)
 	var X_test = [
 		[1, 4, 1, 1, 0, 0],
 		[2, 2, 4, 1, 1, 1],
@@ -66,13 +66,13 @@ func _knn_example():
 	]
 	
 	var knn = DTDAKNN.new(3)
-	knn._fit(X_train, y_train)
-	print("KNN predictions: ", knn._predict(X_test))
-	print("KNN score: ", mltools._get_perf(knn._predict(X_test), y_test, 0), "%")
+	knn.fit(X_train, y_train)
+	print("KNN predictions: ", knn.predict(X_test))
+	print("KNN score: ", mltools.get_perf(knn.predict(X_test), y_test, 0), "%")
 
 func _linreg_example():
-	var X_train = mltools._dropVariable(dataLinR, dataLinR[0].size()-1)
-	var y_train = mltools._getVariable(dataLinR, dataLinR[0].size()-1)
+	var X_train = mltools.drop_variable(dataLinR, dataLinR[0].size()-1)
+	var y_train = mltools.get_variable(dataLinR, dataLinR[0].size()-1)
 	var X_test = [
 		[7.2],
 		[9.0],
@@ -80,12 +80,12 @@ func _linreg_example():
 	]
 	
 	var linreg = DTDALinReg.new(0.01, 1000)
-	linreg._fit(X_train, y_train)
-	print("Linear Regression predictions: ", linreg._predict(X_test))
+	linreg.fit(X_train, y_train)
+	print("Linear Regression predictions: ", linreg.predict(X_test))
 
 func _logreg_example():
-	var X_train = mltools._dropVariable(dataLogR, dataLogR[0].size()-1)
-	var Y_train = mltools._getVariable(dataLogR, dataLogR[0].size()-1)
+	var X_train = mltools.drop_variable(dataLogR, dataLogR[0].size()-1)
+	var Y_train = mltools.get_variable(dataLogR, dataLogR[0].size()-1)
 	var X_test = [
 		[1, 3, 1, 0, 1, 0],
 		[2, 2, 4, 1, 1, 1],
@@ -98,13 +98,13 @@ func _logreg_example():
 	]
 	
 	var logreg = DTDALogReg.new(0.01, 1000)
-	logreg._fit(X_train, Y_train)
-	print("Logistic Regression predictions: ", logreg._predict(X_test))
-	print("Logistic Regression score: ", mltools._get_perf(logreg._predict(X_test), y_test, 2), "%")
+	logreg.fit(X_train, Y_train)
+	print("Logistic Regression predictions: ", logreg.predict(X_test))
+	print("Logistic Regression score: ", mltools.get_perf(logreg.predict(X_test), y_test, 2), "%")
 
 func _svm_example():
-	var X_train = mltools._dropVariable(dataSVM, dataSVM[0].size()-1)
-	var Y_train = mltools._getVariable(dataSVM, dataSVM[0].size()-1)
+	var X_train = mltools.drop_variable(dataSVM, dataSVM[0].size()-1)
+	var Y_train = mltools.get_variable(dataSVM, dataSVM[0].size()-1)
 	var X_test = [
 		[1, 3, 1, 0, 1, 0],
 		[2, 2, 4, 1, 1, 1],
@@ -117,14 +117,14 @@ func _svm_example():
 	]
 	
 	var svm = DTDASVM.new(0.01, 0.01, 1000)
-	svm._fit(X_train, Y_train)
-	print("SVM predictions: ", svm._predict(X_test))
-	print("SVM score: ", mltools._get_perf(svm._predict(X_test), y_test, 3), "%")
+	svm.fit(X_train, Y_train)
+	print("SVM predictions: ", svm.predict(X_test))
+	print("SVM score: ", mltools.get_perf(svm.predict(X_test), y_test, 3), "%")
 
 func _tree_example():
 	# classification, the tree answers the majority label of the leaf
-	var X_train = mltools._dropVariable(dataLogR, dataLogR[0].size()-1)
-	var Y_train = mltools._getVariable(dataLogR, dataLogR[0].size()-1)
+	var X_train = mltools.drop_variable(dataLogR, dataLogR[0].size()-1)
+	var Y_train = mltools.get_variable(dataLogR, dataLogR[0].size()-1)
 	var X_test = [
 		[1, 3, 1, 0, 1, 0],
 		[2, 2, 4, 1, 1, 1],
@@ -133,24 +133,24 @@ func _tree_example():
 	var y_test = [0, 1, 1]
 
 	var tree = DTDATree.new(3, 2, DTDATree.CLASSIFIER)
-	tree._fit(X_train, Y_train)
-	print("Tree predictions: ", tree._predict(X_test))
-	print("Tree score: ", mltools._accuracy(tree._predict(X_test), y_test), "%")
+	tree.fit(X_train, Y_train)
+	print("Tree predictions: ", tree.predict(X_test))
+	print("Tree score: ", mltools.accuracy(tree.predict(X_test), y_test), "%")
 
 	# regression, the tree answers the mean of the leaf
-	var X_lin = mltools._dropVariable(dataLinR, dataLinR[0].size()-1)
-	var y_lin = mltools._getVariable(dataLinR, dataLinR[0].size()-1)
+	var X_lin = mltools.drop_variable(dataLinR, dataLinR[0].size()-1)
+	var y_lin = mltools.get_variable(dataLinR, dataLinR[0].size()-1)
 	var regressor = DTDATree.new(3, 2, DTDATree.REGRESSOR)
-	regressor._fit(X_lin, y_lin)
-	print("Tree regression: ", regressor._predict([[7.2], [9.0], [11.1]]))
-	print("Tree R2: ", mltools._r2_score(regressor._predict(X_lin), y_lin))
+	regressor.fit(X_lin, y_lin)
+	print("Tree regression: ", regressor.predict([[7.2], [9.0], [11.1]]))
+	print("Tree R2: ", mltools.r2_score(regressor.predict(X_lin), y_lin))
 
 	# a XOR, which no linear model can separate
 	var xor_X = [[0, 0], [0, 1], [1, 0], [1, 1]]
 	var xor_y = [0, 1, 1, 0]
 	var xor_tree = DTDATree.new(4, 2, DTDATree.CLASSIFIER)
-	xor_tree._fit(xor_X, xor_y)
-	print("Tree on a XOR: ", xor_tree._predict(xor_X), " expected ", xor_y)
+	xor_tree.fit(xor_X, xor_y)
+	print("Tree on a XOR: ", xor_tree.predict(xor_X), " expected ", xor_y)
 
 # A crowd of trees, each grown on its own draw of the rows and of the features.
 # The world below has one feature that decides the label and five that are pure noise,
@@ -177,9 +177,9 @@ func _forest_example():
 	var unseen = _forest_rows(1000, 48, 0)
 
 	var tree = DTDATree.new(8, 2, DTDATree.CLASSIFIER)
-	tree._fit(train[0], train[1])
-	print("Lone tree, on the rows it learned: ", mltools._accuracy(tree._predict(train[0]), train[1]), "%")
-	print("Lone tree, on rows it never saw: ", mltools._accuracy(tree._predict(unseen[0]), unseen[1]), "%")
+	tree.fit(train[0], train[1])
+	print("Lone tree, on the rows it learned: ", mltools.accuracy(tree.predict(train[0]), train[1]), "%")
+	print("Lone tree, on rows it never saw: ", mltools.accuracy(tree.predict(unseen[0]), unseen[1]), "%")
 
 	# a test set of 48 rows means one row is worth two points, so a single forest can
 	# land level with the tree by luck. Five of them, seeded so the run repeats, is
@@ -187,19 +187,19 @@ func _forest_example():
 	var total = 0.0
 	for k in 5:
 		var forest = DTDAForest.new(25, 8, 2, DTDAForest.CLASSIFIER)
-		forest._set_seed(k + 1)
-		forest._fit(train[0], train[1])
-		total += mltools._accuracy(forest._predict(unseen[0]), unseen[1])
+		forest.set_seed(k + 1)
+		forest.fit(train[0], train[1])
+		total += mltools.accuracy(forest.predict(unseen[0]), unseen[1])
 	print("Forest, on rows it never saw, five seeds averaged: ", snapped(total / 5.0, 0.01), "%")
 
 	# regression, where the trees are averaged instead of voting
-	var X_lin = mltools._dropVariable(dataLinR, dataLinR[0].size()-1)
-	var y_lin = mltools._getVariable(dataLinR, dataLinR[0].size()-1)
+	var X_lin = mltools.drop_variable(dataLinR, dataLinR[0].size()-1)
+	var y_lin = mltools.get_variable(dataLinR, dataLinR[0].size()-1)
 	var regressor = DTDAForest.new(15, 4, 2, DTDAForest.REGRESSOR)
-	regressor._set_seed(1)
-	regressor._fit(X_lin, y_lin)
-	print("Forest regression: ", regressor._predict([[7.2], [9.0], [11.1]]))
-	print("Forest R2: ", mltools._r2_score(regressor._predict(X_lin), y_lin))
+	regressor.set_seed(1)
+	regressor.fit(X_lin, y_lin)
+	print("Forest regression: ", regressor.predict([[7.2], [9.0], [11.1]]))
+	print("Forest R2: ", mltools.r2_score(regressor.predict(X_lin), y_lin))
 
 # The one model here that is given no labels at all: it is handed positions on a map
 # and works out which camp each one belongs to. Three camps are planted below and
@@ -218,9 +218,9 @@ func _kmeans_example():
 	var X = _kmeans_rows()
 	var kmeans = DTDAKMeans.new(3)
 	# a seed, so this example prints the same fit every time
-	kmeans._set_seed(1)
-	print("K-Means groups: ", kmeans._fit_predict(X))
-	var camps = kmeans._get_centroids()
+	kmeans.set_seed(1)
+	print("K-Means groups: ", kmeans.fit_predict(X))
+	var camps = kmeans.get_centroids()
 	for c in camps.size():
 		print("K-Means camp ", c, " at: ", snapped(camps[c][0], 0.01), ", ", snapped(camps[c][1], 0.01))
 	print("K-Means inertia: ", snapped(kmeans.inertia, 0.001))
@@ -229,12 +229,12 @@ func _kmeans_example():
 	# read for where it stops falling sharply, not for how low it goes
 	for count in range(1, 6):
 		var trial = DTDAKMeans.new(count)
-		trial._set_seed(1)
-		trial._fit(X)
+		trial.set_seed(1)
+		trial.fit(X)
 		print("K-Means with ", count, " groups, inertia ", snapped(trial.inertia, 0.001))
 
 	# a brand new spot, put with the camp it is nearest to
-	print("K-Means places a new point: ", kmeans._predict([[38.0, 6.0]]))
+	print("K-Means places a new point: ", kmeans.predict([[38.0, 6.0]]))
 
 # a corridor of six rooms: room 0 is a pit, room 5 is the exit, the agent starts in room 3
 # it learns by playing, there is no training set here
@@ -255,34 +255,34 @@ func _corridor_step(room, action):
 func _qlearning_example():
 	var agent = DTDAQLearning.new(0.2, 0.9, 1.0, 0.99, 0.05)
 	# a fixed seed so this example prints the same run every time
-	agent._set_seed(1)
+	agent.set_seed(1)
 
 	for episode in 500:
 		var room = CORRIDOR_START
 		# a bounded episode, a random walk could otherwise wander for a long time
 		for step in 100:
-			var action = agent._choose_action(room, CORRIDOR_ACTIONS)
+			var action = agent.choose_action(room, CORRIDOR_ACTIONS)
 			var result = _corridor_step(room, action)
-			agent._learn(room, action, result[1], result[0], CORRIDOR_ACTIONS, result[2])
+			agent.learn(room, action, result[1], result[0], CORRIDOR_ACTIONS, result[2])
 			room = result[0]
 			if result[2]:
 				break
 		# one notch less exploration, never below the floor
-		agent._decay_exploration()
+		agent.decay_exploration()
 
 	print("Q-Learning exploration left: ", agent.exploration_rate)
 	# the policy, with no exploration at all: every room walks away from the pit
 	for room in range(1, CORRIDOR_EXIT):
-		print("Q-Learning room ", room, ": ", agent._predict(room),
-			" (left ", snapped(agent._get_q(room, "left"), 0.001),
-			", right ", snapped(agent._get_q(room, "right"), 0.001), ")")
+		print("Q-Learning room ", room, ": ", agent.predict(room),
+			" (left ", snapped(agent.get_q(room, "left"), 0.001),
+			", right ", snapped(agent.get_q(room, "right"), 0.001), ")")
 
 	# playing the learned policy, which should reach the exit in two moves
 	var path = [CORRIDOR_START]
 	var current = CORRIDOR_START
 	for step in 10:
-		var move = agent._predict(current, CORRIDOR_ACTIONS)
-		# _predict() answers null on a room the agent never visited, where it has
+		var move = agent.predict(current, CORRIDOR_ACTIONS)
+		# predict() answers null on a room the agent never visited, where it has
 		# nothing to say: in a real game that is where you fall back on your own default
 		if move == null:
 			break
@@ -302,17 +302,17 @@ func _scaler_example():
 	]
 
 	var standard = DTDAScaler.new()
-	print("Standardized: ", standard._fit_transform(raw))
+	print("Standardized: ", standard.fit_transform(raw))
 
 	var minmax = DTDAScaler.new(DTDAScaler.MINMAX)
-	var scaled = minmax._fit_transform(raw)
+	var scaled = minmax.fit_transform(raw)
 	print("Min-max: ", scaled)
-	print("Back to the original unit: ", minmax._inverse_transform(scaled))
+	print("Back to the original unit: ", minmax.inverse_transform(scaled))
 
 func _metrics_example():
 	# classification, on the logistic regression data
-	var X_train = mltools._dropVariable(dataLogR, dataLogR[0].size()-1)
-	var Y_train = mltools._getVariable(dataLogR, dataLogR[0].size()-1)
+	var X_train = mltools.drop_variable(dataLogR, dataLogR[0].size()-1)
+	var Y_train = mltools.get_variable(dataLogR, dataLogR[0].size()-1)
 	var X_test = [
 		[1, 3, 1, 0, 1, 0],
 		[2, 2, 4, 1, 1, 1],
@@ -321,29 +321,29 @@ func _metrics_example():
 	var y_test = [0, 1, 1]
 
 	var logreg = DTDALogReg.new(0.01, 1000)
-	logreg._fit(X_train, Y_train)
-	var y_pred = logreg._predict(X_test)
-	print("Accuracy: ", mltools._accuracy(y_pred, y_test), "%")
-	print("Confusion matrix: ", mltools._confusion_matrix(y_pred, y_test))
-	print("Precision: ", mltools._precision(y_pred, y_test))
-	print("Recall: ", mltools._recall(y_pred, y_test))
-	print("F1 score: ", mltools._f1_score(y_pred, y_test))
+	logreg.fit(X_train, Y_train)
+	var y_pred = logreg.predict(X_test)
+	print("Accuracy: ", mltools.accuracy(y_pred, y_test), "%")
+	print("Confusion matrix: ", mltools.confusion_matrix(y_pred, y_test))
+	print("Precision: ", mltools.precision(y_pred, y_test))
+	print("Recall: ", mltools.recall(y_pred, y_test))
+	print("F1 score: ", mltools.f1_score(y_pred, y_test))
 
 	# regression, scored on the training set itself
-	var X_lin = mltools._dropVariable(dataLinR, dataLinR[0].size()-1)
-	var y_lin = mltools._getVariable(dataLinR, dataLinR[0].size()-1)
+	var X_lin = mltools.drop_variable(dataLinR, dataLinR[0].size()-1)
+	var y_lin = mltools.get_variable(dataLinR, dataLinR[0].size()-1)
 	var linreg = DTDALinReg.new(0.01, 1000)
-	linreg._fit(X_lin, y_lin)
-	var lin_pred = linreg._predict(X_lin)
-	print("R2: ", mltools._r2_score(lin_pred, y_lin))
-	print("RMSE: ", mltools._rmse(lin_pred, y_lin))
-	print("MAE: ", mltools._mae(lin_pred, y_lin))
+	linreg.fit(X_lin, y_lin)
+	var lin_pred = linreg.predict(X_lin)
+	print("R2: ", mltools.r2_score(lin_pred, y_lin))
+	print("RMSE: ", mltools.rmse(lin_pred, y_lin))
+	print("MAE: ", mltools.mae(lin_pred, y_lin))
 
 # train once, ship the weights, predict without the training set
 func _persistence_example():
 	var path = "user://dtda_linreg.json"
-	var X_train = mltools._dropVariable(dataLinR, dataLinR[0].size()-1)
-	var y_train = mltools._getVariable(dataLinR, dataLinR[0].size()-1)
+	var X_train = mltools.drop_variable(dataLinR, dataLinR[0].size()-1)
+	var y_train = mltools.get_variable(dataLinR, dataLinR[0].size()-1)
 	var X_test = [
 		[7.2],
 		[9.0],
@@ -351,12 +351,12 @@ func _persistence_example():
 	]
 
 	var linreg = DTDALinReg.new(0.01, 1000)
-	linreg._fit(X_train, y_train)
-	print("Before saving: ", linreg._predict(X_test))
-	if not linreg._save(path):
+	linreg.fit(X_train, y_train)
+	print("Before saving: ", linreg.predict(X_test))
+	if not linreg.save(path):
 		return
 
 	# a brand new model, never fitted
 	var loaded = DTDALinReg.new(0.01, 1000)
-	if loaded._load(path):
-		print("After loading: ", loaded._predict(X_test))
+	if loaded.load(path):
+		print("After loading: ", loaded.predict(X_test))

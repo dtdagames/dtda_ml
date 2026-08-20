@@ -1,18 +1,18 @@
-class_name MLTools
+class_name DTDATools
 
 # shared check for every function comparing predictions to expected labels
 func _check_pair(caller, y_pred, y_test):
 	if y_pred.size() == 0:
-		push_error("MLTools: %s called without any prediction" % caller)
+		push_error("DTDATools: %s called without any prediction" % caller)
 		return false
 	if y_pred.size() != y_test.size():
-		push_error("MLTools: %s got %d predictions for %d expected labels" % [caller, y_pred.size(), y_test.size()])
+		push_error("DTDATools: %s got %d predictions for %d expected labels" % [caller, y_pred.size(), y_test.size()])
 		return false
 	return true
 
 # type : 0 KNN, 1 linear reg, 2 logistic reg, 3 SVM
-func _get_perf(y_pred, y_test, type):
-	if not _check_pair("_get_perf()", y_pred, y_test):
+func get_perf(y_pred, y_test, type):
+	if not _check_pair("get_perf()", y_pred, y_test):
 		return 0.0
 
 	# convert >0.5 to 1 from prediction for linear regression
@@ -69,14 +69,14 @@ func _sign_array(x):
 	return matrix
 
 # return array with specific column
-func _getVariable(tempData, tempColumnId):
+func get_variable(tempData, tempColumnId):
 	var newData = []
 	for row in tempData:
 		newData.push_back(row[tempColumnId])
 	return newData
 
 # return array without specific column
-func _dropVariable(tempData, tempColumnId):
+func drop_variable(tempData, tempColumnId):
 	var newData = []
 	for i in tempData.size():
 		newData.push_back([])
@@ -200,9 +200,9 @@ func _std_array(x):
 	return deviation
 
 # report a clear error instead of crashing deep in the math
-func _check_fitted(model_name, trained_value, called = "_predict()"):
+func _check_fitted(model_name, trained_value, called = "predict()"):
 	if trained_value == null:
-		push_error("%s: %s called before _fit()" % [model_name, called])
+		push_error("%s: %s called before fit()" % [model_name, called])
 		return false
 	return true
 
@@ -223,8 +223,8 @@ func _matrix_to_column(x):
 # === Classification metrics === #
 
 # percentage of correct answers
-func _accuracy(y_pred, y_test):
-	if not _check_pair("_accuracy()", y_pred, y_test):
+func accuracy(y_pred, y_test):
+	if not _check_pair("accuracy()", y_pred, y_test):
 		return 0.0
 	var correct = 0
 	for i in y_pred.size():
@@ -233,8 +233,8 @@ func _accuracy(y_pred, y_test):
 	return snapped(float(correct) / float(y_pred.size()) * 100, 0.01)
 
 # true/false positives and negatives around a given positive label
-func _confusion_matrix(y_pred, y_test, positive = 1):
-	if not _check_pair("_confusion_matrix()", y_pred, y_test):
+func confusion_matrix(y_pred, y_test, positive = 1):
+	if not _check_pair("confusion_matrix()", y_pred, y_test):
 		return {}
 	var counts = {"tp": 0, "fp": 0, "tn": 0, "fn": 0}
 	for i in y_pred.size():
@@ -251,8 +251,8 @@ func _confusion_matrix(y_pred, y_test, positive = 1):
 	return counts
 
 # share of the predicted positives that are right, from 0 to 1
-func _precision(y_pred, y_test, positive = 1):
-	var counts = _confusion_matrix(y_pred, y_test, positive)
+func precision(y_pred, y_test, positive = 1):
+	var counts = confusion_matrix(y_pred, y_test, positive)
 	if counts.is_empty():
 		return 0.0
 	var predicted = counts["tp"] + counts["fp"]
@@ -262,8 +262,8 @@ func _precision(y_pred, y_test, positive = 1):
 	return snapped(float(counts["tp"]) / float(predicted), 0.0001)
 
 # share of the real positives that were found, from 0 to 1
-func _recall(y_pred, y_test, positive = 1):
-	var counts = _confusion_matrix(y_pred, y_test, positive)
+func recall(y_pred, y_test, positive = 1):
+	var counts = confusion_matrix(y_pred, y_test, positive)
 	if counts.is_empty():
 		return 0.0
 	var actual = counts["tp"] + counts["fn"]
@@ -272,9 +272,9 @@ func _recall(y_pred, y_test, positive = 1):
 	return snapped(float(counts["tp"]) / float(actual), 0.0001)
 
 # harmonic mean of precision and recall, from 0 to 1
-func _f1_score(y_pred, y_test, positive = 1):
-	var p = _precision(y_pred, y_test, positive)
-	var r = _recall(y_pred, y_test, positive)
+func f1_score(y_pred, y_test, positive = 1):
+	var p = precision(y_pred, y_test, positive)
+	var r = recall(y_pred, y_test, positive)
 	if p + r == 0:
 		return 0.0
 	return snapped(2 * p * r / (p + r), 0.0001)
@@ -282,8 +282,8 @@ func _f1_score(y_pred, y_test, positive = 1):
 # === Regression metrics === #
 
 # mean squared error
-func _mse(y_pred, y_test):
-	if not _check_pair("_mse()", y_pred, y_test):
+func mse(y_pred, y_test):
+	if not _check_pair("mse()", y_pred, y_test):
 		return 0.0
 	var total = 0.0
 	for i in y_pred.size():
@@ -291,12 +291,12 @@ func _mse(y_pred, y_test):
 	return total / float(y_pred.size())
 
 # root mean squared error, in the unit of the target
-func _rmse(y_pred, y_test):
-	return sqrt(_mse(y_pred, y_test))
+func rmse(y_pred, y_test):
+	return sqrt(mse(y_pred, y_test))
 
 # mean absolute error, less sensitive to outliers than the RMSE
-func _mae(y_pred, y_test):
-	if not _check_pair("_mae()", y_pred, y_test):
+func mae(y_pred, y_test):
+	if not _check_pair("mae()", y_pred, y_test):
 		return 0.0
 	var total = 0.0
 	for i in y_pred.size():
@@ -305,8 +305,8 @@ func _mae(y_pred, y_test):
 
 # share of the variance explained by the model, 1.0 is a perfect fit
 # a model worse than always answering the mean scores below 0
-func _r2_score(y_pred, y_test):
-	if not _check_pair("_r2_score()", y_pred, y_test):
+func r2_score(y_pred, y_test):
+	if not _check_pair("r2_score()", y_pred, y_test):
 		return 0.0
 	var mean = _mean_array(y_test)
 	var residual = 0.0
@@ -322,12 +322,12 @@ func _r2_score(y_pred, y_test):
 # === Saving and loading === #
 
 # overridden by every model
-func _to_dict():
-	push_error("MLTools: this class cannot be saved")
+func to_dict():
+	push_error("DTDATools: this class cannot be saved")
 	return {}
 
-func _from_dict(_data):
-	push_error("MLTools: this class cannot be loaded")
+func from_dict(_data):
+	push_error("DTDATools: this class cannot be loaded")
 	return false
 
 # A number a model read out of a file has to be one, not merely present. A file lives
@@ -362,13 +362,13 @@ func _check_number_array(values, model_name, field):
 			return false
 	return true
 
-# What _fit() is handed has to be something it can compute with, and it arrives from
+# What fit() is handed has to be something it can compute with, and it arrives from
 # the caller rather than from a file: one unlucky division upstream is enough. A model
 # that was working must not be left holding a nan, or half rewritten by a fit that
 # raised in the middle, so the rows are weighed before anything is written down
 func _check_matrix(X, model_name):
 	if typeof(X) != TYPE_ARRAY or X.size() == 0:
-		push_error("%s: _fit() got no rows to learn from" % model_name)
+		push_error("%s: fit() got no rows to learn from" % model_name)
 		return false
 	var width = 0
 	for i in X.size():
@@ -377,7 +377,7 @@ func _check_matrix(X, model_name):
 		if i == 0:
 			width = X[i].size()
 		elif X[i].size() != width:
-			push_error("%s: _fit() got a row of %d columns next to a row of %d" % [model_name, X[i].size(), width])
+			push_error("%s: fit() got a row of %d columns next to a row of %d" % [model_name, X[i].size(), width])
 			return false
 	return true
 
@@ -386,10 +386,10 @@ func _check_matrix(X, model_name):
 # and often is. The models that do arithmetic on a label weigh it themselves
 func _check_labels(X, y, model_name):
 	if typeof(y) != TYPE_ARRAY:
-		push_error("%s: _fit() got labels that are not a list" % model_name)
+		push_error("%s: fit() got labels that are not a list" % model_name)
 		return false
 	if y.size() != X.size():
-		push_error("%s: _fit() got %d rows and %d labels" % [model_name, X.size(), y.size()])
+		push_error("%s: fit() got %d rows and %d labels" % [model_name, X.size(), y.size()])
 		return false
 	return true
 
@@ -403,13 +403,18 @@ func _check_model_name(data, expected):
 
 # write a trained model to a JSON file, returns true on success
 # use a user:// path, res:// is read only once the game is exported
-func _save(path):
-	var data = _to_dict()
+#
+# No self. on the calls to this one, and that is not an oversight: there is no global
+# save() for a bare save(path) to reach, so it finds this method. Its neighbour load()
+# has a global of the same name, which wins, and every call to it is qualified for
+# that reason alone. Do not even them up.
+func save(path):
+	var data = to_dict()
 	if data.is_empty():
 		return false
 	var file = FileAccess.open(path, FileAccess.WRITE)
 	if file == null:
-		push_error("MLTools: cannot write %s (%s)" % [path, error_string(FileAccess.get_open_error())])
+		push_error("DTDATools: cannot write %s (%s)" % [path, error_string(FileAccess.get_open_error())])
 		return false
 	# full precision, otherwise the weights are truncated on the way out
 	file.store_string(JSON.stringify(data, "\t", true, true))
@@ -417,17 +422,74 @@ func _save(path):
 	return true
 
 # read a model back from a JSON file, returns true on success
-func _load(path):
+func load(path):
 	if not FileAccess.file_exists(path):
-		push_error("MLTools: %s does not exist" % path)
+		push_error("DTDATools: %s does not exist" % path)
 		return false
 	var file = FileAccess.open(path, FileAccess.READ)
 	if file == null:
-		push_error("MLTools: cannot read %s (%s)" % [path, error_string(FileAccess.get_open_error())])
+		push_error("DTDATools: cannot read %s (%s)" % [path, error_string(FileAccess.get_open_error())])
 		return false
 	var data = JSON.parse_string(file.get_as_text())
 	file.close()
 	if typeof(data) != TYPE_DICTIONARY:
-		push_error("MLTools: %s is not a valid model file" % path)
+		push_error("DTDATools: %s is not a valid model file" % path)
 		return false
-	return _from_dict(data)
+	return from_dict(data)
+
+# === The older names === #
+# Every method above used to carry a leading underscore, which in Godot marks a
+# method as virtual or private: the engine calls _ready() and _process(), you do not.
+# The names below are the ones that shipped, kept working so nothing that already
+# calls them breaks. They only forward. Prefer the ones without the underscore.
+
+func _get_perf(y_pred, y_test, type):
+	return get_perf(y_pred, y_test, type)
+
+func _getVariable(tempData, tempColumnId):
+	return get_variable(tempData, tempColumnId)
+
+func _dropVariable(tempData, tempColumnId):
+	return drop_variable(tempData, tempColumnId)
+
+func _accuracy(y_pred, y_test):
+	return accuracy(y_pred, y_test)
+
+func _confusion_matrix(y_pred, y_test, positive = 1):
+	return confusion_matrix(y_pred, y_test, positive)
+
+func _precision(y_pred, y_test, positive = 1):
+	return precision(y_pred, y_test, positive)
+
+func _recall(y_pred, y_test, positive = 1):
+	return recall(y_pred, y_test, positive)
+
+func _f1_score(y_pred, y_test, positive = 1):
+	return f1_score(y_pred, y_test, positive)
+
+func _mse(y_pred, y_test):
+	return mse(y_pred, y_test)
+
+func _rmse(y_pred, y_test):
+	return rmse(y_pred, y_test)
+
+func _mae(y_pred, y_test):
+	return mae(y_pred, y_test)
+
+func _r2_score(y_pred, y_test):
+	return r2_score(y_pred, y_test)
+
+func _to_dict():
+	return to_dict()
+
+func _from_dict(_data):
+	return from_dict(_data)
+
+func _save(path):
+	return save(path)
+
+# self. is not decoration here: load() on its own is the engine global that reads
+# a resource, and it wins over a method of the same name inside the class. From
+# outside, model.load(path) reaches this one, the way ConfigFile.load() does
+func _load(path):
+	return self.load(path)

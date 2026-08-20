@@ -1,4 +1,4 @@
-extends MLTools
+extends DTDATools
 
 class_name DTDAForest
 
@@ -11,7 +11,7 @@ class_name DTDAForest
 #  - bagging, each tree is fitted on as many rows as the training set holds, drawn
 #    with replacement, so it sees about two thirds of it and a different two thirds
 #  - a feature draw at every split, carried by DTDATree.max_features
-# Both come from one generator, so _set_seed() replays a whole forest.
+# Both come from one generator, so set_seed() replays a whole forest.
 #
 # Like a lone tree, a forest compares features to thresholds and needs no scaling.
 
@@ -29,11 +29,11 @@ var mode
 var max_features
 var m
 var n
-# the trees themselves, null until _fit()
+# the trees themselves, null until fit()
 var trees
-# its own generator, so a run can be replayed with _set_seed()
+# its own generator, so a run can be replayed with set_seed()
 var rng
-# the seed given to _set_seed(), replayed by _reset(), null when none was asked for
+# the seed given to set_seed(), replayed by reset(), null when none was asked for
 var start_seed
 
 func _init(forest_num_trees := 10, forest_max_depth := 5, forest_min_samples_split := 2, forest_mode := CLASSIFIER, forest_max_features := 0):
@@ -46,13 +46,13 @@ func _init(forest_num_trees := 10, forest_max_depth := 5, forest_min_samples_spl
 	start_seed = null
 
 # fix the draws, for a reproducible forest
-# _reset() puts the generator back on that same seed
-func _set_seed(value):
+# reset() puts the generator back on that same seed
+func set_seed(value):
 	start_seed = value
 	rng.seed = value
 
 # forget the trees and put the generator back where it started
-func _reset():
+func reset():
 	trees = null
 	if start_seed != null:
 		rng.seed = start_seed
@@ -69,7 +69,7 @@ func _resolved_max_features(count):
 		return max(1, int(count / 3.0))
 	return max(1, int(sqrt(float(count))))
 
-func _fit(newX, newY):
+func fit(newX, newY):
 	# The rows are weighed before a single field is written: a fit that took them as
 	# they came would leave a working model holding a nan, or half rewritten by a
 	# raise in the middle. Answers false when it refuses, true when it fitted
@@ -82,7 +82,7 @@ func _fit(newX, newY):
 	if mode == REGRESSOR and not _check_number_array(newY, "DTDAForest", "labels"):
 		return false
 	if num_trees <= 0:
-		push_error("DTDAForest: _fit() called for %d trees" % num_trees)
+		push_error("DTDAForest: fit() called for %d trees" % num_trees)
 		return false
 	m = newX.size()
 	n = newX[0].size()
@@ -99,9 +99,9 @@ func _fit(newX, newY):
 			bag_Y.push_back(newY[pick])
 		var tree = DTDATree.new(max_depth, min_samples_split, mode, per_split)
 		# each tree draws its features from a stream of ours, so the whole forest
-		# replays from a single _set_seed()
-		tree._set_seed(rng.randi())
-		tree._fit(bag_X, bag_Y)
+		# replays from a single set_seed()
+		tree.set_seed(rng.randi())
+		tree.fit(bag_X, bag_Y)
 		grown.push_back(tree)
 	trees = grown
 	return true
@@ -123,13 +123,13 @@ func _combine(answers):
 			best_count = counts[value]
 	return winner
 
-func _predict(newX):
+func predict(newX):
 	if not _check_fitted("DTDAForest", trees):
 		return []
 	# every tree answers the whole batch, then each row is settled across the trees
 	var answers = []
 	for tree in trees:
-		answers.push_back(tree._predict(newX))
+		answers.push_back(tree.predict(newX))
 	var pred = []
 	for i in newX.size():
 		var row = []
@@ -138,13 +138,13 @@ func _predict(newX):
 		pred.push_back(_combine(row))
 	return pred
 
-func _to_dict():
-	if not _check_fitted("DTDAForest", trees, "_save()"):
+func to_dict():
+	if not _check_fitted("DTDAForest", trees, "save()"):
 		return {}
 	var saved = []
 	for tree in trees:
 		# a tree already knows how to write itself down, a forest is the list
-		saved.push_back(tree._to_dict())
+		saved.push_back(tree.to_dict())
 	return {
 		"model": "DTDAForest",
 		"version": FORMAT_VERSION,
@@ -156,7 +156,7 @@ func _to_dict():
 		"trees": saved,
 	}
 
-func _from_dict(data):
+func from_dict(data):
 	if not _check_model_name(data, "DTDAForest"):
 		return false
 	# int() because a version read back from JSON carries as a float
@@ -181,7 +181,7 @@ func _from_dict(data):
 			return false
 		var tree = DTDATree.new()
 		# the tree checks its own name, its own root and its own structure
-		if not tree._from_dict(entry):
+		if not tree.from_dict(entry):
 			push_error("DTDAForest: one of the saved trees could not be read")
 			return false
 		rebuilt.push_back(tree)
@@ -192,5 +192,26 @@ func _from_dict(data):
 	max_features = int(data.get("max_features", max_features))
 	trees = rebuilt
 	return true
+
+
+# === The older names === #
+# Every method above used to carry a leading underscore, which in Godot marks a
+# method as virtual or private: the engine calls _ready() and _process(), you do not.
+# The names below are the ones that shipped, kept working so nothing that already
+# calls them breaks. They only forward. Prefer the ones without the underscore.
+
+func _set_seed(value):
+	return set_seed(value)
+
+func _reset():
+	return reset()
+
+func _fit(newX, newY):
+	return fit(newX, newY)
+
+func _predict(newX):
+	return predict(newX)
+
+
 
 # === End Random forest === #

@@ -1,4 +1,4 @@
-extends MLTools
+extends DTDATools
 
 class_name DTDAKNN
 
@@ -32,7 +32,7 @@ func _get_neighbors(test_row):
 		neighbors.push_back(distances[u][0])
 	return neighbors
 
-func _fit(newX, newY):
+func fit(newX, newY):
 	# The rows are weighed before a single field is written: a fit that took them as
 	# they came would leave a working model holding a nan, or half rewritten by a
 	# raise in the middle. Answers false when it refuses, true when it fitted
@@ -59,7 +59,7 @@ func _majority_vote(output_values):
 			best_count = counts[value]
 	return tempPred
 
-func _predict(newX):
+func predict(newX):
 	if not _check_fitted("DTDAKNN", X):
 		return []
 	var pred = []
@@ -71,8 +71,8 @@ func _predict(newX):
 		pred.push_back(_majority_vote(output_values))
 	return pred
 
-func _to_dict():
-	if not _check_fitted("DTDAKNN", X, "_save()"):
+func to_dict():
+	if not _check_fitted("DTDAKNN", X, "save()"):
 		return {}
 	return {
 		"model": "DTDAKNN",
@@ -82,7 +82,7 @@ func _to_dict():
 		"Y": Y,
 	}
 
-func _from_dict(data):
+func from_dict(data):
 	if not _check_model_name(data, "DTDAKNN"):
 		return false
 	# Everything is read aside first and only takes the place of the standing model
@@ -90,7 +90,7 @@ func _from_dict(data):
 	# can be edited by hand, and a training set that is a text used to load with a
 	# success and fall apart at the first prediction
 	# _get_neighbors() counts this out at every prediction, so it belongs with X and Y
-	# and not with the settings _fit() reads: a text answered null, and a count of
+	# and not with the settings fit() reads: a text answered null, and a count of
 	# zero or less answered a list of nulls, in both cases after loading with a success
 	var saved_k = data.get("num_neighbors", num_neighbors)
 	if not _check_number(saved_k, "DTDAKNN", "neighbour count"):
@@ -115,5 +115,20 @@ func _from_dict(data):
 	X = saved_X
 	Y = saved_Y
 	return true
+
+
+# === The older names === #
+# Every method above used to carry a leading underscore, which in Godot marks a
+# method as virtual or private: the engine calls _ready() and _process(), you do not.
+# The names below are the ones that shipped, kept working so nothing that already
+# calls them breaks. They only forward. Prefer the ones without the underscore.
+
+func _fit(newX, newY):
+	return fit(newX, newY)
+
+func _predict(newX):
+	return predict(newX)
+
+
 
 # === End KNN model === #

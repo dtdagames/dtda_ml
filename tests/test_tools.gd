@@ -4,15 +4,15 @@
 const PLAN = 81
 
 func _run(t):
-	var ml = MLTools.new()
+	var ml = DTDATools.new()
 
 	t.section("MLTools data helpers")
 	var data = [
 		[1, 2, 3],
 		[4, 5, 6],
 	]
-	t.check_equal("_dropVariable removes the column", ml._dropVariable(data, 2), [[1, 2], [4, 5]])
-	t.check_equal("_getVariable keeps the column", ml._getVariable(data, 2), [3, 6])
+	t.check_equal("_dropVariable removes the column", ml.drop_variable(data, 2), [[1, 2], [4, 5]])
+	t.check_equal("_getVariable keeps the column", ml.get_variable(data, 2), [3, 6])
 	t.check_near("_mean_array", ml._mean_array([1, 2, 3, 4]), 2.5)
 	t.check_near("_std_array", ml._std_array([2, 4, 4, 4, 5, 5, 7, 9]), 2.0)
 	t.check_near("_std_array returns 1.0 on a constant column", ml._std_array([7, 7, 7]), 1.0)
@@ -30,36 +30,36 @@ func _run(t):
 	# expected [0, 1, 1] against [1, 1, 0] gives one tp, one fp, one fn
 	var y_test = [0, 1, 1]
 	var y_pred = [1, 1, 0]
-	t.check_near("_accuracy", ml._accuracy(y_pred, y_test), 33.33, 0.01)
-	var confusion = ml._confusion_matrix(y_pred, y_test)
+	t.check_near("_accuracy", ml.accuracy(y_pred, y_test), 33.33, 0.01)
+	var confusion = ml.confusion_matrix(y_pred, y_test)
 	t.check_equal("_confusion_matrix tp", confusion["tp"], 1)
 	t.check_equal("_confusion_matrix fp", confusion["fp"], 1)
 	t.check_equal("_confusion_matrix fn", confusion["fn"], 1)
 	t.check_equal("_confusion_matrix tn", confusion["tn"], 0)
-	t.check_near("_precision", ml._precision(y_pred, y_test), 0.5)
-	t.check_near("_recall", ml._recall(y_pred, y_test), 0.5)
-	t.check_near("_f1_score", ml._f1_score(y_pred, y_test), 0.5)
-	t.check_near("_accuracy on a perfect prediction", ml._accuracy(y_test, y_test), 100.0)
+	t.check_near("_precision", ml.precision(y_pred, y_test), 0.5)
+	t.check_near("_recall", ml.recall(y_pred, y_test), 0.5)
+	t.check_near("_f1_score", ml.f1_score(y_pred, y_test), 0.5)
+	t.check_near("_accuracy on a perfect prediction", ml.accuracy(y_test, y_test), 100.0)
 	# nothing predicted positive, the denominator of the precision is zero
-	t.check_near("_precision without any positive predicted", ml._precision([0, 0, 0], y_test), 0.0)
+	t.check_near("_precision without any positive predicted", ml.precision([0, 0, 0], y_test), 0.0)
 
 	t.section("Regression metrics")
 	var truth = [10.0, 20.0, 30.0]
-	t.check_near("_mse", ml._mse([12.0, 20.0, 30.0], truth), 4.0 / 3.0)
-	t.check_near("_rmse", ml._rmse([12.0, 20.0, 30.0], truth), sqrt(4.0 / 3.0))
-	t.check_near("_mae", ml._mae([12.0, 18.0, 30.0], truth), 4.0 / 3.0)
-	t.check_near("_r2_score on a perfect fit", ml._r2_score(truth, truth), 1.0)
+	t.check_near("_mse", ml.mse([12.0, 20.0, 30.0], truth), 4.0 / 3.0)
+	t.check_near("_rmse", ml.rmse([12.0, 20.0, 30.0], truth), sqrt(4.0 / 3.0))
+	t.check_near("_mae", ml.mae([12.0, 18.0, 30.0], truth), 4.0 / 3.0)
+	t.check_near("_r2_score on a perfect fit", ml.r2_score(truth, truth), 1.0)
 	# answering the mean everywhere is the definition of R2 = 0
-	t.check_near("_r2_score of a constant model on the mean", ml._r2_score([20.0, 20.0, 20.0], truth), 0.0)
+	t.check_near("_r2_score of a constant model on the mean", ml.r2_score([20.0, 20.0, 20.0], truth), 0.0)
 	# no variance to explain, must not divide by zero
-	t.check_near("_r2_score on a constant target", ml._r2_score([1, 1, 1], [5, 5, 5]), 0.0)
+	t.check_near("_r2_score on a constant target", ml.r2_score([1, 1, 1], [5, 5, 5]), 0.0)
 
 	t.section("Metric guards (the errors below are expected)")
-	t.check_near("_get_perf on an empty prediction", ml._get_perf([], [1], 0), 0.0)
-	t.check_near("_get_perf on mismatched sizes", ml._get_perf([1, 0, 1], [0, 1], 0), 0.0)
-	t.check_near("_accuracy on mismatched sizes", ml._accuracy([1, 0, 1], [0, 1]), 0.0)
-	t.check_equal("_confusion_matrix on mismatched sizes", ml._confusion_matrix([1], [0, 1]), {})
-	t.check_near("_mse on an empty prediction", ml._mse([], []), 0.0)
+	t.check_near("_get_perf on an empty prediction", ml.get_perf([], [1], 0), 0.0)
+	t.check_near("_get_perf on mismatched sizes", ml.get_perf([1, 0, 1], [0, 1], 0), 0.0)
+	t.check_near("_accuracy on mismatched sizes", ml.accuracy([1, 0, 1], [0, 1]), 0.0)
+	t.check_equal("_confusion_matrix on mismatched sizes", ml.confusion_matrix([1], [0, 1]), {})
+	t.check_near("_mse on an empty prediction", ml.mse([], []), 0.0)
 
 	t.section("DTDAScaler")
 	var raw = [
@@ -68,11 +68,11 @@ func _run(t):
 		[5.0, 500.0],
 	]
 	var minmax = DTDAScaler.new(DTDAScaler.MINMAX)
-	var scaled = minmax._fit_transform(raw)
+	var scaled = minmax.fit_transform(raw)
 	t.check_near_array("min-max first row", scaled[0], [0.0, 0.0])
 	t.check_near_array("min-max middle row", scaled[1], [0.5, 0.5])
 	t.check_near_array("min-max last row", scaled[2], [1.0, 1.0])
-	var restored = minmax._inverse_transform(scaled)
+	var restored = minmax.inverse_transform(scaled)
 	t.check_near_array("_inverse_transform restores the first row", restored[0], raw[0])
 	t.check_near_array("_inverse_transform restores the last row", restored[2], raw[2])
 
@@ -85,26 +85,26 @@ func _run(t):
 		[121000],
 	]
 	var int_minmax = DTDAScaler.new(DTDAScaler.MINMAX)
-	var int_scaled = int_minmax._fit_transform(integers)
+	var int_scaled = int_minmax.fit_transform(integers)
 	t.check_near_array("min-max on an integer column", int_scaled[1], [40000.0 / 81000.0])
 	t.check_near_array("_inverse_transform on an integer column",
-		int_minmax._inverse_transform(int_scaled)[1], [80000.0])
+		int_minmax.inverse_transform(int_scaled)[1], [80000.0])
 
 	var standard = DTDAScaler.new()
-	var centered = standard._fit_transform(raw)
-	var first_column = ml._getVariable(centered, 0)
+	var centered = standard.fit_transform(raw)
+	var first_column = ml.get_variable(centered, 0)
 	t.check_near("standardized column has a null mean", ml._mean_array(first_column), 0.0)
 	t.check_near("standardized column has a unit deviation", ml._std_array(first_column), 1.0)
 
 	# a constant column must not divide by zero
 	var constant = DTDAScaler.new()
-	var flat = constant._fit_transform([[7.0], [7.0]])
+	var flat = constant.fit_transform([[7.0], [7.0]])
 	t.check_near_array("a constant column stays finite", flat[0], [0.0])
 
 	# the scaling learned on the training set must apply as is to new data
 	var reused = DTDAScaler.new(DTDAScaler.MINMAX)
-	reused._fit(raw)
-	t.check_near_array("_transform reuses the learned scaling", reused._transform([[5.0, 500.0]])[0], [1.0, 1.0])
+	reused.fit(raw)
+	t.check_near_array("_transform reuses the learned scaling", reused.transform([[5.0, 500.0]])[0], [1.0, 1.0])
 
 	t.section("MLTools, numbers read out of a file")
 	# what a model reads out of user:// has to be usable, not merely present
@@ -136,7 +136,7 @@ func _run(t):
 		ml._check_number_array([1.0, inf_value], "M", "weights"), false)
 
 	t.section("MLTools, rows handed to a fit")
-	# what a caller passes to _fit() arrives from its own arithmetic, so one unlucky
+	# what a caller passes to fit() arrives from its own arithmetic, so one unlucky
 	# division upstream is all it takes
 	t.check_equal("a sound matrix is a sound matrix",
 		ml._check_matrix([[1.0, 2.0], [3, 4]], "M"), true)
@@ -158,43 +158,43 @@ func _run(t):
 	t.section("DTDAScaler, reading a saved scaler")
 	# a scaler is written inside the file of the model that owns it, and that file
 	# lives in user:// where it can be edited by hand. What is read back has to be
-	# usable, not merely present: _transform() reads an offset and a scale per column
+	# usable, not merely present: transform() reads an offset and a scale per column
 	# and divides by the scale
 	var sound = DTDAScaler.new()
 	t.check_equal("a sound scaler is read back",
-		sound._from_dict({"mode": DTDAScaler.MINMAX, "offsets": [1.0], "scales": [2.0]}), true)
-	t.check_near_array("and scales with what it read", sound._transform([[5.0]])[0], [2.0])
+		sound.from_dict({"mode": DTDAScaler.MINMAX, "offsets": [1.0], "scales": [2.0]}), true)
+	t.check_near_array("and scales with what it read", sound.transform([[5.0]])[0], [2.0])
 	# the same trap as the feature index of a tree: a mode read back from JSON is a
 	# float, and this one is compared against an enum
 	var moded = DTDAScaler.new()
-	moded._from_dict({"mode": 1.0, "offsets": [1.0], "scales": [2.0]})
+	moded.from_dict({"mode": 1.0, "offsets": [1.0], "scales": [2.0]})
 	t.check_equal("the mode comes back as an integer", typeof(moded.mode), TYPE_INT)
 
 	t.section("DTDAScaler, refusing a saved scaler (the errors below are expected)")
 	t.check_equal("offsets that are not a list",
-		DTDAScaler.new()._from_dict({"offsets": "nope", "scales": [1.0]}), false)
+		DTDAScaler.new().from_dict({"offsets": "nope", "scales": [1.0]}), false)
 	t.check_equal("scales that are not a list",
-		DTDAScaler.new()._from_dict({"offsets": [1.0], "scales": "nope"}), false)
+		DTDAScaler.new().from_dict({"offsets": [1.0], "scales": "nope"}), false)
 	t.check_equal("a scaler with nothing in it",
-		DTDAScaler.new()._from_dict({"offsets": [], "scales": []}), false)
+		DTDAScaler.new().from_dict({"offsets": [], "scales": []}), false)
 	t.check_equal("more offsets than scales",
-		DTDAScaler.new()._from_dict({"offsets": [1.0, 2.0], "scales": [1.0]}), false)
+		DTDAScaler.new().from_dict({"offsets": [1.0, 2.0], "scales": [1.0]}), false)
 	t.check_equal("an offset that is not a number",
-		DTDAScaler.new()._from_dict({"offsets": [1.0, "nope"], "scales": [1.0, 2.0]}), false)
+		DTDAScaler.new().from_dict({"offsets": [1.0, "nope"], "scales": [1.0, 2.0]}), false)
 	# "2.5" and not "nope": float("nope") is 0.0, so the guard on the zero below would
 	# answer for it and this assertion would not name the guard it claims
 	t.check_equal("a scale that is not a number",
-		DTDAScaler.new()._from_dict({"offsets": [1.0, 2.0], "scales": [1.0, "2.5"]}), false)
+		DTDAScaler.new().from_dict({"offsets": [1.0, 2.0], "scales": [1.0, "2.5"]}), false)
 	# this one used to load and answer inf at the first prediction, without an error
 	t.check_equal("a scale of zero, which _transform would divide by",
-		DTDAScaler.new()._from_dict({"offsets": [1.0], "scales": [0.0]}), false)
+		DTDAScaler.new().from_dict({"offsets": [1.0], "scales": [0.0]}), false)
 	# and a refused dictionary must not take the standing scaler down with it
 	var standing = DTDAScaler.new()
-	standing._fit([[0.0], [10.0]])
-	var standing_before = standing._transform([[5.0]])
-	standing._from_dict({"offsets": [99.0], "scales": [0.0]})
+	standing.fit([[0.0], [10.0]])
+	var standing_before = standing.transform([[5.0]])
+	standing.from_dict({"offsets": [99.0], "scales": [0.0]})
 	t.check_near_array("a refused scaler leaves the standing one alone",
-		standing._transform([[5.0]])[0], standing_before[0])
+		standing.transform([[5.0]])[0], standing_before[0])
 
 	t.section("DTDAScaler guard (the error below is expected)")
-	t.check_empty("_transform before _fit returns an empty array", DTDAScaler.new()._transform([[1.0]]))
+	t.check_empty("_transform before _fit returns an empty array", DTDAScaler.new().transform([[1.0]]))

@@ -1,4 +1,4 @@
-extends MLTools
+extends DTDATools
 
 class_name DTDATree
 
@@ -36,7 +36,7 @@ func _init(tree_max_depth := 5, tree_min_samples_split := 2, tree_mode := CLASSI
 
 # fix the feature draws, for a reproducible tree. Pointless while max_features is 0,
 # where nothing is drawn
-func _set_seed(value):
+func set_seed(value):
 	rng.seed = value
 
 # Gini impurity of the labels held by the given rows, 0.0 when they all agree
@@ -157,7 +157,7 @@ func _build(rows, depth):
 		"right": _build(split["right"], depth + 1),
 	}
 
-func _fit(newX, newY):
+func fit(newX, newY):
 	# The rows are weighed before a single field is written: a fit that took them as
 	# they came would leave a working model holding a nan, or half rewritten by a
 	# raise in the middle. Answers false when it refuses, true when it fitted
@@ -191,7 +191,7 @@ func _predict_row(row):
 			node = node["right"]
 	return node["leaf"]
 
-func _predict(newX):
+func predict(newX):
 	if not _check_fitted("DTDATree", root):
 		return []
 	var pred = []
@@ -199,8 +199,8 @@ func _predict(newX):
 		pred.push_back(_predict_row(newX[i]))
 	return pred
 
-func _to_dict():
-	if not _check_fitted("DTDATree", root, "_save()"):
+func to_dict():
+	if not _check_fitted("DTDATree", root, "save()"):
 		return {}
 	return {
 		"model": "DTDATree",
@@ -212,7 +212,7 @@ func _to_dict():
 		"root": root,
 	}
 
-func _from_dict(data):
+func from_dict(data):
 	if not _check_model_name(data, "DTDATree"):
 		return false
 	# A model file lives in user://, where it can be edited by hand, and DTDAForest
@@ -231,5 +231,23 @@ func _from_dict(data):
 	max_features = int(data.get("max_features", 0))
 	root = saved_root
 	return true
+
+
+# === The older names === #
+# Every method above used to carry a leading underscore, which in Godot marks a
+# method as virtual or private: the engine calls _ready() and _process(), you do not.
+# The names below are the ones that shipped, kept working so nothing that already
+# calls them breaks. They only forward. Prefer the ones without the underscore.
+
+func _set_seed(value):
+	return set_seed(value)
+
+func _fit(newX, newY):
+	return fit(newX, newY)
+
+func _predict(newX):
+	return predict(newX)
+
+
 
 # === End Decision tree === #
