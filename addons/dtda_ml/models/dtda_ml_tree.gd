@@ -158,9 +158,17 @@ func _build(rows, depth):
 	}
 
 func _fit(newX, newY):
-	if newX.size() == 0:
-		push_error("DTDATree: _fit() called with no data")
-		return
+	# The rows are weighed before a single field is written: a fit that took them as
+	# they came would leave a working model holding a nan, or half rewritten by a
+	# raise in the middle. Answers false when it refuses, true when it fitted
+	if not _check_matrix(newX, "DTDATree"):
+		return false
+	if not _check_labels(newX, newY, "DTDATree"):
+		return false
+	# a leaf answers the mean when regressing, so the labels are numbers there. When
+	# classifying it only counts them, and a label can be whatever names a class
+	if mode == REGRESSOR and not _check_number_array(newY, "DTDATree", "labels"):
+		return false
 	m = newX.size()
 	n = newX[0].size()
 	X = newX
@@ -170,6 +178,7 @@ func _fit(newX, newY):
 	for i in m:
 		rows.push_back(i)
 	root = _build(rows, 0)
+	return true
 
 # walk down the tree, a value lower than or equal to the threshold goes left
 func _predict_row(row):

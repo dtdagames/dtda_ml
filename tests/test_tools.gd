@@ -1,7 +1,7 @@
 # MLTools helpers, metrics and DTDAScaler.
 
 # how many assertions this suite runs, checked by the runner
-const PLAN = 64
+const PLAN = 81
 
 func _run(t):
 	var ml = MLTools.new()
@@ -121,6 +121,39 @@ func _run(t):
 	t.check_equal("_check_number takes a float", ml._check_number(3.5, "M", "intercept"), true)
 	t.check_equal("_check_number refuses a text", ml._check_number("3.5", "M", "intercept"), false)
 	t.check_equal("_check_number refuses a null", ml._check_number(null, "M", "intercept"), false)
+
+	# through variables, so nothing is folded away before it runs
+	var zero = 0.0
+	var nan_value = zero / zero
+	var inf_value = 1.0 / zero
+	t.check_equal("a nan is not a number to compute with",
+		ml._check_number(nan_value, "M", "intercept"), false)
+	t.check_equal("an infinity is not one either",
+		ml._check_number(inf_value, "M", "intercept"), false)
+	t.check_equal("a list holding a nan is not a list of numbers",
+		ml._check_number_array([1.0, nan_value], "M", "weights"), false)
+	t.check_equal("a list holding an infinity is not one either",
+		ml._check_number_array([1.0, inf_value], "M", "weights"), false)
+
+	t.section("MLTools, rows handed to a fit")
+	# what a caller passes to _fit() arrives from its own arithmetic, so one unlucky
+	# division upstream is all it takes
+	t.check_equal("a sound matrix is a sound matrix",
+		ml._check_matrix([[1.0, 2.0], [3, 4]], "M"), true)
+	t.check_equal("a matrix that is not a list", ml._check_matrix("nope", "M"), false)
+	t.check_equal("a matrix with no rows", ml._check_matrix([], "M"), false)
+	t.check_equal("a row that is not a list", ml._check_matrix([[1.0], "nope"], "M"), false)
+	t.check_equal("a row with nothing in it", ml._check_matrix([[1.0], []], "M"), false)
+	t.check_equal("a row holding a text", ml._check_matrix([[1.0], ["nope"]], "M"), false)
+	t.check_equal("a row holding a nan", ml._check_matrix([[1.0], [nan_value]], "M"), false)
+	t.check_equal("a row holding an infinity", ml._check_matrix([[1.0], [inf_value]], "M"), false)
+	t.check_equal("rows of unequal widths", ml._check_matrix([[1.0, 2.0], [3.0]], "M"), false)
+	# and the labels, counted rather than read: a label can be whatever names a class
+	t.check_equal("as many labels as rows", ml._check_labels([[1.0], [2.0]], [7, 9], "M"), true)
+	t.check_equal("labels that name a class rather than a number",
+		ml._check_labels([[1.0], [2.0]], ["red", "blue"], "M"), true)
+	t.check_equal("labels that are not a list", ml._check_labels([[1.0]], "nope", "M"), false)
+	t.check_equal("fewer labels than rows", ml._check_labels([[1.0], [2.0]], [7], "M"), false)
 
 	t.section("DTDAScaler, reading a saved scaler")
 	# a scaler is written inside the file of the model that owns it, and that file

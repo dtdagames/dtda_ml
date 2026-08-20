@@ -97,12 +97,28 @@ Example:
 - var X_test_scaled = scaler._transform(X_test) #the scaling learned on X_train
 - print("Back to the original unit: ", scaler._inverse_transform(X_train_scaled))
 
+=== What a fit accepts ===
+
+_fit() is handed whatever your own code computed, and one unlucky division upstream is enough to hand it a nan. A nan answers false to every comparison, so it used to travel into the weights of a regression and stay there, every prediction answering nan from then on without a word.
+
+So _fit() weighs the rows before it writes anything down, and answers true when it fitted and false when it refused:
+- the rows have to be a list of rows, none of them empty, all of the same width, holding only real numbers. A text, a nan or an infinity in any cell is refused
+- there have to be as many labels as rows
+
+What the labels hold is left alone where the model only counts them or hands them back: a KNN answers a label as it came, and a tree or a forest classifying only counts it, so a label can be a string naming a class, and passing "cave" and "camp" to any of the three is supported rather than tolerated. The three models that descend on a label, and a tree or a forest in REGRESSOR mode, do weigh it, because there it is a number they compute with.
+
+A fit that is refused changes nothing: a model that was working goes on working, with the weights it already had. That holds for the seven models that have a _fit(); DTDAQLearning learns one transition at a time instead, and _learn() holds the same promise, answering null and leaving the cell as it was when the reward is not a real number. It is the same promise as the one on _load(), for the same reason, and it is the one that matters more, since no file has to be edited for a caller to hand over a nan.
+
+Example:
+- if not model._fit(X_train, y_train):
+-     print("the training data was not usable, the model is untouched")
+
 === Saving and loading a model ===
 
 Every model can be written to a JSON file and read back, so you can train once and ship the weights with your game instead of retraining at every launch.
 _save(path) returns true on success, _load(path) fills a model you just created. Both report a clear error and return false on failure, and _load() refuses a file holding a different kind of model.
 
-A file lives in user://, where a player can edit it, so _load() checks what it reads before believing it. What is checked is what a prediction computes with: the weights and the intercept of a regression or an SVM, the neighbour count and the training rows of a KNN, the offsets and scales of a scaler, the list of trees of a forest, the centres and the inertia of a K-Means, the q values of an agent. A text where a number belongs, a list that is empty or shorter than the one it goes with, a scale of zero that every prediction would divide by, a neighbour count below one: each of those answers false with an error.
+A file lives in user://, where a player can edit it, so _load() checks what it reads before believing it. What is checked is what a prediction computes with: the weights and the intercept of a regression or an SVM, the neighbour count and the training rows of a KNN, the offsets and scales of a scaler, the list of trees of a forest, the centres and the inertia of a K-Means, the q values of an agent. A text where a number belongs, an infinity where a number to compute with belongs, a list that is empty or shorter than the one it goes with, a scale of zero that every prediction would divide by, a neighbour count below one: each of those answers false with an error. The infinity is not hypothetical here: a weight written 1e400 in the file is more than a float can hold and comes back from JSON as an infinity. A literal nan or inf, which is what _save() writes if a model ever holds one, makes the whole file unreadable and is turned away a step earlier.
 
 What is not checked, and it is worth knowing: the inside of a decision tree. _load() makes sure the root is a node, then takes the branches as they come, so a tree whose nodes have been rewritten by hand can load and answer nonsense without complaining. Neither is the mode of a forest, which every prediction reads to decide between a vote and a mean: a text there is read as a vote, so a regression forest can come back answering like a classifier, and it does so in silence. Neither are the settings only _fit() reads, such as the learning rate or the number of rounds: a wrong one there costs nothing until you train again.
 
@@ -272,7 +288,7 @@ Epsilon is a probability: the rate and its floor are brought into [0, 1] when th
 
 The loop:
 - _choose_action(state, valid_actions) : epsilon-greedy, picks among the actions that are legal right now. Safe to call before anything was learned, the agent then simply explores. On a state it never met every action is worth 0, so the first of the list comes out
-- _learn(state, action, reward, next_state, next_actions, done) : one transition, the Bellman update Q(s, a) += lr * (reward + gamma * max Q(s', a') - Q(s, a)). Pass done = true on the last transition of an episode, a terminal state has no future to add. next_actions restricts what the agent may do next, leave it out (or pass null) to look at everything already learned about next_state
+- _learn(state, action, reward, next_state, next_actions, done) : one transition, refused with a null answer when the reward is not a real number, the cell keeping the value it had. the Bellman update Q(s, a) += lr * (reward + gamma * max Q(s', a') - Q(s, a)). Pass done = true on the last transition of an episode, a terminal state has no future to add. next_actions restricts what the agent may do next, leave it out (or pass null) to look at everything already learned about next_state
 - _decay_exploration() : call it at the end of an episode, epsilon goes down one notch and never below its floor
 - _predict(state, valid_actions) : the learned policy with no exploration at all, this is what you ship. valid_actions is optional, leave it out (or pass null) to pick among everything learned in that state. On a state the agent never met, or one whose row holds no action, it reports an error and answers null, with or without a list: it will not dress up a tie between zeros as a policy. Use _choose_action() when you need a move no matter what
 - _get_q(state, action) : the value of a pair, 0.0 when it was never met

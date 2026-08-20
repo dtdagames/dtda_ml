@@ -21,7 +21,7 @@ const DATA_LOGR = [
 ]
 
 # how many assertions this suite runs, checked by the runner
-const PLAN = 48
+const PLAN = 54
 
 # A noisy world with one feature that matters and five that do not.
 # The label follows x0 alone, and one row in eight carries the wrong one: that is the
@@ -166,6 +166,35 @@ func _run(t):
 		total += ml._accuracy(trial._predict(held_out[0]), held_out[1])
 	var forest_test = total / 5.0
 	t.check("five forests average well above the lone tree", forest_test - lone_test > 3.0)
+
+	t.section("Random forest, a fit that is refused changes nothing")
+	var zero = 0.0
+	var nan_row = [[1.0, 2.0], [2.0, 1.0], [8.0, zero / zero]]
+	var inf_row = [[1.0, 2.0], [2.0, 1.0], [8.0, 1.0 / zero]]
+	var text_row = [[1.0, 2.0], [2.0, 1.0], [8.0, "nope"]]
+	var ragged = [[1.0, 2.0], [2.0], [8.0, 9.0]]
+	var three = [0, 1, 1]
+	var sound_rows = [[1.0, 2.0], [2.0, 1.0], [8.0, 9.0]]
+	var steady = DTDAForest.new(5, 3, 2, DTDAForest.CLASSIFIER)
+	steady._set_seed(2)
+	steady._fit(X_log, y_log)
+	var steady_before = steady._predict(X_log)
+	t.check_equal("a forest refuses a row holding a nan", steady._fit(nan_row, three), false)
+	t.check_equal("a forest refuses more rows than labels", steady._fit(sound_rows, [0]), false)
+	steady._fit(inf_row, three)
+	steady._fit(text_row, three)
+	steady._fit(ragged, three)
+	t.check_near_array("a forest predicts what it predicted before those four",
+		steady._predict(X_log), steady_before)
+	t.check_equal("a regressor forest refuses labels that are not numbers",
+		DTDAForest.new(3, 3, 2, DTDAForest.REGRESSOR)._fit([[1.0], [2.0]], ["red", "blue"]), false)
+	# and the other side of that line: classifying, a forest only counts labels and
+	# votes among them, so a label naming a class is not a fault
+	var named = DTDAForest.new(5, 3, 2, DTDAForest.CLASSIFIER)
+	named._set_seed(1)
+	t.check_equal("a classifier forest takes labels that name a class",
+		named._fit([[0.0, 0.0], [0.5, 0.5], [9.0, 9.0], [9.5, 9.5]], ["cave", "cave", "camp", "camp"]), true)
+	t.check_equal("and votes a name back", named._predict([[0.2, 0.2], [9.2, 9.2]]), ["cave", "camp"])
 
 	t.section("Random forest, saving and loading")
 	var path = "user://dtda_ml_test_forest.json"

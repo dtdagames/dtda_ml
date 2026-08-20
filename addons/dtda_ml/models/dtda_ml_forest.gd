@@ -70,15 +70,20 @@ func _resolved_max_features(count):
 	return max(1, int(sqrt(float(count))))
 
 func _fit(newX, newY):
-	if newX.size() == 0:
-		push_error("DTDAForest: _fit() called with no data")
-		return
-	if newX.size() != newY.size():
-		push_error("DTDAForest: _fit() got %d rows for %d labels" % [newX.size(), newY.size()])
-		return
+	# The rows are weighed before a single field is written: a fit that took them as
+	# they came would leave a working model holding a nan, or half rewritten by a
+	# raise in the middle. Answers false when it refuses, true when it fitted
+	if not _check_matrix(newX, "DTDAForest"):
+		return false
+	if not _check_labels(newX, newY, "DTDAForest"):
+		return false
+	# as in a lone tree: a leaf answers the mean when regressing, and only counts
+	# labels when classifying, where a label can be whatever names a class
+	if mode == REGRESSOR and not _check_number_array(newY, "DTDAForest", "labels"):
+		return false
 	if num_trees <= 0:
 		push_error("DTDAForest: _fit() called for %d trees" % num_trees)
-		return
+		return false
 	m = newX.size()
 	n = newX[0].size()
 	var per_split = _resolved_max_features(n)
@@ -99,6 +104,7 @@ func _fit(newX, newY):
 		tree._fit(bag_X, bag_Y)
 		grown.push_back(tree)
 	trees = grown
+	return true
 
 # how the trees are put back together: the mean when regressing, the majority label
 # otherwise. A tie goes to the label the first tree answered, so the same forest

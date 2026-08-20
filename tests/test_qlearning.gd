@@ -50,7 +50,7 @@ func _load_written(content, agent = null):
 	return agent._load(path)
 
 # how many assertions this suite runs, checked by the runner
-const PLAN = 84
+const PLAN = 89
 
 func _run(t):
 	t.section("Q-Learning, the Bellman update step by step")
@@ -89,6 +89,22 @@ func _run(t):
 	boot._learn("c", "wait", 100, "end", [], true)
 	boot._learn("a", "go", 0, "b")
 	t.check_near("the fallback stays inside the next state", boot._get_q("a", "go"), 9.0)
+
+	t.section("Q-Learning, a reward that is not a number")
+	# a reward arrives from whatever the game computed, and it lands straight in the
+	# table. A nan there answers false to every comparison, so _best_action() can no
+	# longer name a best action for that state and _predict() falls silent
+	var zero = 0.0
+	var poisoned = DTDAQLearning.new(0.5, 0.9, 0.0)
+	poisoned._learn("room", "north", 10, "end", [], true)
+	var kept = poisoned._get_q("room", "north")
+	t.check("a nan reward is refused", poisoned._learn("room", "north", zero / zero, "end", [], true) == null)
+	t.check("an infinite reward is refused too",
+		poisoned._learn("room", "north", 1.0 / zero, "end", [], true) == null)
+	t.check("a reward that is not a number at all is refused",
+		poisoned._learn("room", "north", "nope", "end", [], true) == null)
+	t.check_near("the cell keeps the value it had", poisoned._get_q("room", "north"), kept, 0.0)
+	t.check_equal("and the state can still name its best action", poisoned._predict("room"), "north")
 
 	t.section("Q-Learning, terminal transitions")
 	var term = DTDAQLearning.new(1.0, 0.9, 0.0)

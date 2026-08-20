@@ -1,7 +1,7 @@
 # DTDAKMeans, the k-means clustering.
 
 # how many assertions this suite runs, checked by the runner
-const PLAN = 56
+const PLAN = 59
 
 # a file this model reads from end to end, which every guard below breaks in exactly
 # one place: two fields wrong at once and either guard could be the one answering
@@ -137,9 +137,12 @@ func _run(t):
 			continue
 		# 1e-9 is far tighter than any move the iteration would still have to make on
 		# columns counted in units, and loose enough not to rest on the last bit
-		if abs(learned[c][0] - totals[0] / float(count)) > 1e-9:
-			off_centre += 1
-		elif abs(learned[c][1] - totals[1] / float(count)) > 1e-9:
+		# asked the way round that counts a centre only when it is provably on the
+		# middle: a nan answers false to every comparison, so disqualifying by "too
+		# far" would read a centre that is not a number at all as landing exactly right
+		var first_on = abs(learned[c][0] - totals[0] / float(count)) <= 1e-9
+		var second_on = abs(learned[c][1] - totals[1] / float(count)) <= 1e-9
+		if not (first_on and second_on):
 			off_centre += 1
 	t.check_equal("every centre sits on the middle of what it holds", off_centre, 0)
 
@@ -182,7 +185,9 @@ func _run(t):
 		var many = DTDAKMeans.new(4, 100, 8)
 		many._set_seed(s + 1)
 		many._fit(line)
-		if many.inertia > one.inertia + 1e-9:
+		# the same way round, and for the same reason: an inertia that is not provably
+		# no worse counts as worse, a nan included
+		if not (many.inertia <= one.inertia + 1e-9):
 			worse += 1
 		if many.inertia < one.inertia - 1e-9:
 			better += 1
@@ -281,6 +286,27 @@ func _run(t):
 			if not on_a_value:
 				adrift += 1
 	t.check_equal("a group left holding nothing keeps the centre it had", adrift, 0)
+
+	t.section("K-Means, a fit that is refused changes nothing")
+	# the one this lot started from: a nan in a row made every run answer a nan
+	# inertia, no run was ever kept, and the centres were replaced by nothing at all
+	var zero = 0.0
+	var nan_row = [[1.0, 2.0], [2.0, 1.0], [8.0, zero / zero]]
+	var inf_row = [[1.0, 2.0], [2.0, 1.0], [8.0, 1.0 / zero]]
+	var text_row = [[1.0, 2.0], [2.0, 1.0], [8.0, "nope"]]
+	var ragged = [[1.0, 2.0], [2.0], [8.0, 9.0]]
+	var three = [0, 1, 1]
+	var steady = DTDAKMeans.new(2, 50, 2)
+	steady._set_seed(3)
+	steady._fit(X)
+	var steady_before = steady._predict(X)
+	var steady_inertia = steady.inertia
+	t.check_equal("a fit refuses a row holding a nan", steady._fit(nan_row), false)
+	steady._fit(inf_row)
+	steady._fit(text_row)
+	steady._fit(ragged)
+	t.check_equal("and the centres are still there", steady._predict(X), steady_before)
+	t.check_near("with the inertia they had", steady.inertia, steady_inertia, 0.0)
 
 	t.section("K-Means, saving and loading")
 	var path = "user://dtda_ml_test_kmeans.json"

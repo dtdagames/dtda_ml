@@ -337,6 +337,12 @@ func _check_number(value, model_name, field):
 	if not (typeof(value) in [TYPE_INT, TYPE_FLOAT]):
 		push_error("%s: the saved %s is not a number" % [model_name, field])
 		return false
+	# a nan and an inf carry a numeric type and are not numbers anything can compute
+	# with: a nan answers false to every comparison and spreads through every weight
+	# it touches without a word
+	if typeof(value) == TYPE_FLOAT and not is_finite(value):
+		push_error("%s: the saved %s is %s, which is not a number to compute with" % [model_name, field, value])
+		return false
 	return true
 
 # the same for a list of numbers, which also has to hold something
@@ -351,6 +357,40 @@ func _check_number_array(values, model_name, field):
 		if not (typeof(value) in [TYPE_INT, TYPE_FLOAT]):
 			push_error("%s: the saved %s holds something that is not a number" % [model_name, field])
 			return false
+		if typeof(value) == TYPE_FLOAT and not is_finite(value):
+			push_error("%s: the saved %s holds %s, which is not a number to compute with" % [model_name, field, value])
+			return false
+	return true
+
+# What _fit() is handed has to be something it can compute with, and it arrives from
+# the caller rather than from a file: one unlucky division upstream is enough. A model
+# that was working must not be left holding a nan, or half rewritten by a fit that
+# raised in the middle, so the rows are weighed before anything is written down
+func _check_matrix(X, model_name):
+	if typeof(X) != TYPE_ARRAY or X.size() == 0:
+		push_error("%s: _fit() got no rows to learn from" % model_name)
+		return false
+	var width = 0
+	for i in X.size():
+		if not _check_number_array(X[i], model_name, "row %d" % i):
+			return false
+		if i == 0:
+			width = X[i].size()
+		elif X[i].size() != width:
+			push_error("%s: _fit() got a row of %d columns next to a row of %d" % [model_name, X[i].size(), width])
+			return false
+	return true
+
+# as many labels as there are rows. What the labels hold is left alone: a KNN answers
+# them back as they came and a classifier only counts them, so a label can be a string
+# and often is. The models that do arithmetic on a label weigh it themselves
+func _check_labels(X, y, model_name):
+	if typeof(y) != TYPE_ARRAY:
+		push_error("%s: _fit() got labels that are not a list" % model_name)
+		return false
+	if y.size() != X.size():
+		push_error("%s: _fit() got %d rows and %d labels" % [model_name, X.size(), y.size()])
+		return false
 	return true
 
 # guard against loading a KNN file into a linear regression

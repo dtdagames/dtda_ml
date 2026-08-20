@@ -155,16 +155,20 @@ func _total_inertia(rows, centres):
 	return total
 
 func _fit(newX):
+	# The rows are weighed before a single field is written: a fit that took them as
+	# they came would leave a working model holding a nan, or half rewritten by a
+	# raise in the middle. Answers false when it refuses, true when it fitted
+	if not _check_matrix(newX, "DTDAKMeans"):
+		return false
 	if k <= 0:
 		push_error("DTDAKMeans: _fit() called for %d groups" % k)
-		return
+		return false
 	if num_runs <= 0:
 		push_error("DTDAKMeans: _fit() called for %d runs" % num_runs)
-		return
-	# an empty set of rows lands here too, being smaller than any number of groups
+		return false
 	if newX.size() < k:
 		push_error("DTDAKMeans: _fit() got %d rows for %d groups" % [newX.size(), k])
-		return
+		return false
 	m = newX.size()
 	n = newX[0].size()
 	# built aside, so a fit that never reaches the end leaves the standing model alone
@@ -182,6 +186,7 @@ func _fit(newX):
 	scaler = fitted_scaler
 	centroids = best
 	inertia = best_inertia
+	return true
 
 func _predict(newX):
 	if not _check_fitted("DTDAKMeans", centroids):

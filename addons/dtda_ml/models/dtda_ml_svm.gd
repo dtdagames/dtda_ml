@@ -18,6 +18,16 @@ func _init(learning_rate=0.01, lambda_param=0.01, n_iters=1000):
 	iter = n_iters
 
 func _fit(newX, newY):
+	# The rows are weighed before a single field is written: a fit that took them as
+	# they came would leave a working model holding a nan, or half rewritten by a
+	# raise in the middle. Answers false when it refuses, true when it fitted
+	if not _check_matrix(newX, "DTDASVM"):
+		return false
+	if not _check_labels(newX, newY, "DTDASVM"):
+		return false
+	# the descent multiplies by the label, so it has to be a number
+	if not _check_number_array(newY, "DTDASVM", "labels"):
+		return false
 	m = newX.size()
 	n = newX[0].size()
 
@@ -50,6 +60,7 @@ func _fit(newX, newY):
 				var coefLR = _multiply_array_coef(subLWXY, lr)
 				W = _substract_arrays(W, coefLR)
 				b = b - (lr*y2[i])
+	return true
 
 func _predict(newX):
 	if not _check_fitted("DTDASVM", W):

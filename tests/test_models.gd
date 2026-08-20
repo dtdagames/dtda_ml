@@ -43,7 +43,7 @@ func _scale_rows(rows, factor):
 	return scaled
 
 # how many assertions this suite runs, checked by the runner
-const PLAN = 59
+const PLAN = 79
 
 # write a handmade file and hand it to a model, for the guards on the file itself
 func _load_written(content, model):
@@ -206,6 +206,11 @@ func _run(t):
 		_load_written('{"model": "DTDALinReg", "version": 1, "W": [], ' + '"x_scaler": {"mode": 0, "offsets": [0.0], "scales": [1.0]}, "y_scaler": {"mode": 0, "offsets": [0.0], "scales": [1.0]}' + '}', DTDALinReg.new(0.01, 1000)), false)
 	t.check_equal("LinReg refuses weights holding something that is not a number",
 		_load_written('{"model": "DTDALinReg", "version": 1, "W": [1.0, "nope"], ' + '"x_scaler": {"mode": 0, "offsets": [0.0], "scales": [1.0]}, "y_scaler": {"mode": 0, "offsets": [0.0], "scales": [1.0]}' + '}', DTDALinReg.new(0.01, 1000)), false)
+	# the one way a number that is not finite reaches this far: a literal too large for
+	# a float, which JSON hands back as an infinity. A literal nan or inf in the file
+	# would make it unreadable and never get here at all
+	t.check_equal("LinReg refuses a weight too large to hold",
+		_load_written('{"model": "DTDALinReg", "version": 1, "W": [1e400], "b": 0.0, ' + '"x_scaler": {"mode": 0, "offsets": [0.0], "scales": [1.0]}, "y_scaler": {"mode": 0, "offsets": [0.0], "scales": [1.0]}' + '}', DTDALinReg.new(0.01, 1000)), false)
 	t.check_equal("LinReg refuses an intercept that is not a number",
 		_load_written('{"model": "DTDALinReg", "version": 1, "W": [1.0], "b": "nope", ' + '"x_scaler": {"mode": 0, "offsets": [0.0], "scales": [1.0]}, "y_scaler": {"mode": 0, "offsets": [0.0], "scales": [1.0]}' + '}', DTDALinReg.new(0.01, 1000)), false)
 	t.check_equal("LogReg refuses weights that are not a list",
@@ -265,6 +270,75 @@ func _run(t):
 		_load_written('{"model": "DTDAKNN", "version": 1, "num_neighbors": 0, "X": [[0]], "Y": [3]}', knn), false)
 	t.check_near_array("and none of those refusals moved it",
 		knn._predict(CLASS_TEST), knn_before)
+
+	t.section("A fit that is refused changes nothing (the errors below are expected)")
+	# _fit() is handed whatever the caller computed, and one unlucky division upstream
+	# is enough: a nan in a row used to travel into the weights and stay there, every
+	# prediction answering nan from then on without a word. No file is needed for this.
+	# Four different faults per model, so the invariant does not hang on one of them
+	var zero = 0.0
+	var nan_row = [[1.0, 2.0], [2.0, 1.0], [8.0, zero / zero]]
+	var inf_row = [[1.0, 2.0], [2.0, 1.0], [8.0, 1.0 / zero]]
+	var text_row = [[1.0, 2.0], [2.0, 1.0], [8.0, "nope"]]
+	var ragged = [[1.0, 2.0], [2.0], [8.0, 9.0]]
+	var three = [0, 1, 1]
+	var sound_rows = [[1.0, 2.0], [2.0, 1.0], [8.0, 9.0]]
+
+	var knn_probe = [[1, 4, 1, 1, 0, 0], [2, 2, 4, 1, 1, 1], [4, 1, 1, 0, 1, 0]]
+	var knn_fit_before = knn._predict(knn_probe)
+	t.check_equal("KNN refuses a row holding a nan", knn._fit(nan_row, three), false)
+	t.check_equal("KNN refuses rows of unequal widths", knn._fit(ragged, three), false)
+	t.check_equal("KNN _fit refuses more rows than labels", knn._fit(sound_rows, [0]), false)
+	knn._fit(inf_row, three)
+	knn._fit(text_row, three)
+	t.check_near_array("KNN answers what it answered before those four",
+		knn._predict(knn_probe), knn_fit_before)
+	# The other side of the same line, and the one the README puts first: a KNN only
+	# hands a label back, so a label naming a class is not a fault and must not be
+	# refused. Without this, tightening the three fits that do weigh their labels into
+	# all seven would go through without an objection
+	var named = DTDAKNN.new(1)
+	t.check_equal("KNN takes labels that name a class",
+		named._fit([[0.0, 0.0], [0.5, 0.5], [9.0, 9.0], [9.5, 9.5]], ["cave", "cave", "camp", "camp"]), true)
+	t.check_equal("and hands the name back", named._predict([[0.2, 0.2], [9.2, 9.2]]), ["cave", "camp"])
+
+	var lin_before = linreg._predict([[7.2], [9.0], [11.1]])
+	t.check_equal("LinReg refuses a row holding a nan", linreg._fit(nan_row, three), false)
+	linreg._fit(inf_row, three)
+	linreg._fit(text_row, three)
+	linreg._fit(ragged, three)
+	# labels this one descends on, so they have to be numbers
+	t.check_equal("LinReg refuses more rows than labels", linreg._fit(sound_rows, [0]), false)
+	t.check_equal("LinReg refuses labels that are not numbers",
+		linreg._fit([[1.0], [2.0]], ["red", "blue"]), false)
+	t.check_near_array("LinReg predicts what it predicted before them",
+		linreg._predict([[7.2], [9.0], [11.1]]), lin_before, 0.001)
+
+	var log_before = logreg._predict(CLASS_TEST)
+	t.check_equal("LogReg refuses a row holding an infinity", logreg._fit(inf_row, three), false)
+	logreg._fit(nan_row, three)
+	logreg._fit(text_row, three)
+	logreg._fit(ragged, three)
+	t.check_equal("LogReg refuses more rows than labels", logreg._fit(sound_rows, [0]), false)
+	t.check_equal("LogReg refuses labels that are not numbers",
+		logreg._fit([[1.0], [2.0]], ["red", "blue"]), false)
+	t.check_near_array("LogReg predicts what it predicted before them",
+		logreg._predict(CLASS_TEST), log_before)
+
+	var svm_fit_before = svm._predict(CLASS_TEST)
+	t.check_equal("SVM refuses a row that is not a row", svm._fit([[1.0, 2.0], "nope"], [0, 1]), false)
+	svm._fit(nan_row, three)
+	svm._fit(inf_row, three)
+	svm._fit(ragged, three)
+	t.check_equal("SVM refuses more rows than labels", svm._fit(sound_rows, [0]), false)
+	t.check_equal("SVM refuses labels that are not numbers",
+		svm._fit([[1.0], [2.0]], ["red", "blue"]), false)
+	t.check_near_array("SVM predicts what it predicted before them",
+		svm._predict(CLASS_TEST), svm_fit_before)
+
+	# and a fit that goes through still says so
+	t.check_equal("a fit that goes through answers true",
+		DTDAKNN.new(1)._fit([[0.0], [1.0]], [5, 9]), true)
 
 	t.section("Fit guards (the errors below are expected)")
 	t.check_empty("KNN _predict before _fit", DTDAKNN.new(3)._predict([[1]]))
