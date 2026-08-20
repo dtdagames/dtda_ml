@@ -5,7 +5,7 @@ extends SceneTree
 # Exits with 0 when everything passes, 1 otherwise, which is what CI reads.
 #
 # Some tests exercise the guards of the addon on purpose, so the output contains
-# expected "MLTools: ..." errors. Those ones are not failures.
+# expected "DTDATools: ..." errors. Those ones are not failures.
 #
 # Everything else the engine prints is worth reading, because a GDScript runtime
 # error raised while an assertion was being evaluated used to swallow that
@@ -13,7 +13,7 @@ extends SceneTree
 # line stayed green while the suite quietly ran fewer checks than it used to.
 # Two things guard against that now and both must stay:
 #   - check_near() and check_near_array() refuse a value that is not a number
-#     instead of letting abs() raise, so a _predict() regressed to null lands as
+#     instead of letting abs() raise, so a predict() regressed to null lands as
 #     a FAIL rather than disappearing
 #   - every suite declares a PLAN, the number of assertions it runs, and the
 #     runner fails when it records a different number
@@ -28,6 +28,7 @@ const TEST_SCRIPTS = [
 	"res://tests/test_qlearning.gd",
 	"res://tests/test_forest.gd",
 	"res://tests/test_kmeans.gd",
+	"res://tests/test_names.gd",
 ]
 
 var passed = 0

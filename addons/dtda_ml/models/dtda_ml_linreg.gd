@@ -1,4 +1,4 @@
-extends MLTools
+extends DTDATools
 
 class_name DTDALinReg
 
@@ -38,7 +38,7 @@ func _update_weights():
 	W = _substract_arrays(W, dWrate)
 	b = b - (rate * dB)
 
-func _fit(newX, newY):
+func fit(newX, newY):
 	# The rows are weighed before a single field is written: a fit that took them as
 	# they came would leave a working model holding a nan, or half rewritten by a
 	# raise in the middle. Answers false when it refuses, true when it fitted
@@ -57,22 +57,22 @@ func _fit(newX, newY):
 
 	W = _array_zeros(n)
 	b = 0
-	X = x_scaler._fit_transform(newX)
-	Y = _matrix_to_column(y_scaler._fit_transform(_column_to_matrix(newY)))
+	X = x_scaler.fit_transform(newX)
+	Y = _matrix_to_column(y_scaler.fit_transform(_column_to_matrix(newY)))
 
 	for i in iterations:
 		_update_weights()
 	return true
 
-func _predict(newX):
+func predict(newX):
 	if not _check_fitted("DTDALinReg", W):
 		return []
-	var pred = _predict_scaled(x_scaler._transform(newX))
+	var pred = _predict_scaled(x_scaler.transform(newX))
 	# back to the unit of the training target
-	return _matrix_to_column(y_scaler._inverse_transform(_column_to_matrix(pred)))
+	return _matrix_to_column(y_scaler.inverse_transform(_column_to_matrix(pred)))
 
-func _to_dict():
-	if not _check_fitted("DTDALinReg", W, "_save()"):
+func to_dict():
+	if not _check_fitted("DTDALinReg", W, "save()"):
 		return {}
 	return {
 		"model": "DTDALinReg",
@@ -81,18 +81,18 @@ func _to_dict():
 		"iterations": iterations,
 		"W": W,
 		"b": b,
-		"x_scaler": x_scaler._to_dict(),
-		"y_scaler": y_scaler._to_dict(),
+		"x_scaler": x_scaler.to_dict(),
+		"y_scaler": y_scaler.to_dict(),
 	}
 
-func _from_dict(data):
+func from_dict(data):
 	if not _check_model_name(data, "DTDALinReg"):
 		return false
 	# Everything is read aside first and only takes the place of the standing model
 	# once the whole file is known to be readable. Assigning as it went used to leave
 	# a working model with the weights of a file it had just refused
 	# absent, malformed and unusable answer the same way: a null is not a list either,
-	# and _predict() computes with every one of these numbers
+	# and predict() computes with every one of these numbers
 	var saved_W = data.get("W")
 	if not _check_number_array(saved_W, "DTDALinReg", "weights"):
 		return false
@@ -101,9 +101,9 @@ func _from_dict(data):
 		return false
 	var saved_x = DTDAScaler.new()
 	var saved_y = DTDAScaler.new()
-	if not saved_x._from_dict(data.get("x_scaler", {})):
+	if not saved_x.from_dict(data.get("x_scaler", {})):
 		return false
-	if not saved_y._from_dict(data.get("y_scaler", {})):
+	if not saved_y.from_dict(data.get("y_scaler", {})):
 		return false
 	rate = data.get("rate", rate)
 	iterations = data.get("iterations", iterations)
@@ -113,5 +113,20 @@ func _from_dict(data):
 	x_scaler = saved_x
 	y_scaler = saved_y
 	return true
+
+
+# === The older names === #
+# Every method above used to carry a leading underscore, which in Godot marks a
+# method as virtual or private: the engine calls _ready() and _process(), you do not.
+# The names below are the ones that shipped, kept working so nothing that already
+# calls them breaks. They only forward. Prefer the ones without the underscore.
+
+func _fit(newX, newY):
+	return fit(newX, newY)
+
+func _predict(newX):
+	return predict(newX)
+
+
 
 # === End Linear Regression model === #

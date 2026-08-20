@@ -1,4 +1,4 @@
-extends MLTools
+extends DTDATools
 
 class_name DTDAScaler
 
@@ -16,9 +16,9 @@ func _init(scaler_mode := STANDARD):
 	mode = scaler_mode
 
 # learn the offset and the scale of every column
-func _fit(X):
+func fit(X):
 	if X.size() == 0:
-		push_error("DTDAScaler: _fit() called with no data")
+		push_error("DTDAScaler: fit() called with no data")
 		return
 	offsets = []
 	scales = []
@@ -37,8 +37,8 @@ func _fit(X):
 			# _std_array already returns 1.0 on a constant column
 			scales.push_back(_std_array(column))
 
-func _transform(X):
-	if not _check_fitted("DTDAScaler", offsets, "_transform()"):
+func transform(X):
+	if not _check_fitted("DTDAScaler", offsets, "transform()"):
 		return []
 	var matrix = []
 	for i in X.size():
@@ -47,13 +47,13 @@ func _transform(X):
 			matrix[i].push_back((X[i][u] - offsets[u]) / scales[u])
 	return matrix
 
-func _fit_transform(X):
-	_fit(X)
-	return _transform(X)
+func fit_transform(X):
+	fit(X)
+	return transform(X)
 
 # back to the unit of the data the scaler was fitted on
-func _inverse_transform(X):
-	if not _check_fitted("DTDAScaler", offsets, "_inverse_transform()"):
+func inverse_transform(X):
+	if not _check_fitted("DTDAScaler", offsets, "inverse_transform()"):
 		return []
 	var matrix = []
 	for i in X.size():
@@ -62,21 +62,21 @@ func _inverse_transform(X):
 			matrix[i].push_back(X[i][u] * scales[u] + offsets[u])
 	return matrix
 
-func _to_dict():
+func to_dict():
 	return {
 		"mode": mode,
 		"offsets": offsets,
 		"scales": scales,
 	}
 
-# A saved scaler has to be usable, not merely present. _transform() reads an offset
+# A saved scaler has to be usable, not merely present. transform() reads an offset
 # and a scale per column and divides by the scale, so a file holding a string, a list
 # shorter than the other or a zero used to load without a word and only fall apart at
 # the first prediction, or worse answer inf. A model file lives in user://, where it
 # can be edited by hand.
 # Nothing is written into the scaler until the whole dictionary has been read, so a
 # refused one leaves a working scaler exactly as it was
-func _from_dict(data):
+func from_dict(data):
 	var saved_offsets = data.get("offsets")
 	var saved_scales = data.get("scales")
 	if typeof(saved_offsets) != TYPE_ARRAY or typeof(saved_scales) != TYPE_ARRAY:
@@ -89,7 +89,7 @@ func _from_dict(data):
 		if not (typeof(saved_offsets[i]) in [TYPE_INT, TYPE_FLOAT] and typeof(saved_scales[i]) in [TYPE_INT, TYPE_FLOAT]):
 			push_error("DTDAScaler: the saved scaler holds something that is not a number")
 			return false
-		# _transform() divides by this, and _fit() never writes a zero there: a
+		# transform() divides by this, and fit() never writes a zero there: a
 		# constant column is given a scale of 1.0 for that very reason
 		if float(saved_scales[i]) == 0.0:
 			push_error("DTDAScaler: the saved scaler holds a scale of zero")
@@ -99,5 +99,26 @@ func _from_dict(data):
 	offsets = saved_offsets
 	scales = saved_scales
 	return true
+
+
+# === The older names === #
+# Every method above used to carry a leading underscore, which in Godot marks a
+# method as virtual or private: the engine calls _ready() and _process(), you do not.
+# The names below are the ones that shipped, kept working so nothing that already
+# calls them breaks. They only forward. Prefer the ones without the underscore.
+
+func _fit(X):
+	return fit(X)
+
+func _transform(X):
+	return transform(X)
+
+func _fit_transform(X):
+	return fit_transform(X)
+
+func _inverse_transform(X):
+	return inverse_transform(X)
+
+
 
 # === End Feature scaler === #

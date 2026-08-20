@@ -1,15 +1,15 @@
-extends MLTools
+extends DTDATools
 
 class_name DTDAKMeans
 
 # === K-Means === #
-# The first model here that learns without labels. _fit() is handed rows and nothing
+# The first model here that learns without labels. fit() is handed rows and nothing
 # else, and works out which of k groups each row belongs to.
 #
 # Distances are euclidean, so a column counted in tens of thousands would drown a
 # column counted in units. The rows are standardised internally by a DTDAScaler, the
 # way DTDALinReg does it: nothing has to be scaled beforehand, and the unit a column
-# is written in does not change the answer. _get_centroids() hands the centres back
+# is written in does not change the answer. get_centroids() hands the centres back
 # in the unit of the training data, which is what a game wants to draw.
 #
 # Where the centres start decides where they end, and a poor start stays poor: it is
@@ -18,7 +18,7 @@ class_name DTDAKMeans
 #    with a weight of its squared distance to the nearest centre already chosen, so
 #    the starts spread out instead of huddling
 #  - several runs from several starts, keeping the one with the lowest inertia
-# Both draw on one generator, so _set_seed() replays a whole fit.
+# Both draw on one generator, so set_seed() replays a whole fit.
 
 const FORMAT_VERSION = 1
 
@@ -27,15 +27,15 @@ var max_iterations
 var num_runs
 var m
 var n
-# the centres, in the scaled space the model works in, null until _fit()
+# the centres, in the scaled space the model works in, null until fit()
 var centroids
 # the sum of the squared distances from every training row to its centre. Without
 # labels to compare against it is the only measure of quality there is
 var inertia
 var scaler
-# its own generator, so a run can be replayed with _set_seed()
+# its own generator, so a run can be replayed with set_seed()
 var rng
-# the seed given to _set_seed(), replayed by _reset(), null when none was asked for
+# the seed given to set_seed(), replayed by reset(), null when none was asked for
 var start_seed
 
 func _init(kmeans_k := 3, kmeans_max_iterations := 100, kmeans_num_runs := 5):
@@ -46,13 +46,13 @@ func _init(kmeans_k := 3, kmeans_max_iterations := 100, kmeans_num_runs := 5):
 	start_seed = null
 
 # fix the draws, for a reproducible fit
-# _reset() puts the generator back on that same seed
-func _set_seed(value):
+# reset() puts the generator back on that same seed
+func set_seed(value):
 	start_seed = value
 	rng.seed = value
 
 # forget the centres and put the generator back where it started
-func _reset():
+func reset():
 	centroids = null
 	inertia = null
 	if start_seed != null:
@@ -154,26 +154,26 @@ func _total_inertia(rows, centres):
 		total += _nearest(row, centres)[1]
 	return total
 
-func _fit(newX):
+func fit(newX):
 	# The rows are weighed before a single field is written: a fit that took them as
 	# they came would leave a working model holding a nan, or half rewritten by a
 	# raise in the middle. Answers false when it refuses, true when it fitted
 	if not _check_matrix(newX, "DTDAKMeans"):
 		return false
 	if k <= 0:
-		push_error("DTDAKMeans: _fit() called for %d groups" % k)
+		push_error("DTDAKMeans: fit() called for %d groups" % k)
 		return false
 	if num_runs <= 0:
-		push_error("DTDAKMeans: _fit() called for %d runs" % num_runs)
+		push_error("DTDAKMeans: fit() called for %d runs" % num_runs)
 		return false
 	if newX.size() < k:
-		push_error("DTDAKMeans: _fit() got %d rows for %d groups" % [newX.size(), k])
+		push_error("DTDAKMeans: fit() got %d rows for %d groups" % [newX.size(), k])
 		return false
 	m = newX.size()
 	n = newX[0].size()
 	# built aside, so a fit that never reaches the end leaves the standing model alone
 	var fitted_scaler = DTDAScaler.new()
-	var rows = fitted_scaler._fit_transform(newX)
+	var rows = fitted_scaler.fit_transform(newX)
 	var best = null
 	var best_inertia = INF
 	for run in num_runs:
@@ -188,35 +188,35 @@ func _fit(newX):
 	inertia = best_inertia
 	return true
 
-func _predict(newX):
+func predict(newX):
 	if not _check_fitted("DTDAKMeans", centroids):
 		return []
 	var pred = []
-	for row in scaler._transform(newX):
+	for row in scaler.transform(newX):
 		pred.push_back(_nearest(row, centroids)[0])
 	return pred
 
-func _fit_predict(newX):
-	_fit(newX)
-	return _predict(newX)
+func fit_predict(newX):
+	fit(newX)
+	return predict(newX)
 
 # the inertia of any set of rows against the centres already learned. Lower is
 # tighter, and it only ever compares groupings of the same rows: it falls as k rises
 # whatever the grouping is worth, so it cannot be read as a score on its own
-func _inertia_of(newX):
-	if not _check_fitted("DTDAKMeans", centroids, "_inertia_of()"):
+func inertia_of(newX):
+	if not _check_fitted("DTDAKMeans", centroids, "inertia_of()"):
 		return 0.0
-	return _total_inertia(scaler._transform(newX), centroids)
+	return _total_inertia(scaler.transform(newX), centroids)
 
 # the centres in the unit of the training data, rather than the scaled space the
 # model works in
-func _get_centroids():
-	if not _check_fitted("DTDAKMeans", centroids, "_get_centroids()"):
+func get_centroids():
+	if not _check_fitted("DTDAKMeans", centroids, "get_centroids()"):
 		return []
-	return scaler._inverse_transform(centroids)
+	return scaler.inverse_transform(centroids)
 
-func _to_dict():
-	if not _check_fitted("DTDAKMeans", centroids, "_save()"):
+func to_dict():
+	if not _check_fitted("DTDAKMeans", centroids, "save()"):
 		return {}
 	return {
 		"model": "DTDAKMeans",
@@ -226,10 +226,10 @@ func _to_dict():
 		"num_runs": num_runs,
 		"inertia": inertia,
 		"centroids": centroids,
-		"scaler": scaler._to_dict(),
+		"scaler": scaler.to_dict(),
 	}
 
-func _from_dict(data):
+func from_dict(data):
 	if not _check_model_name(data, "DTDAKMeans"):
 		return false
 	# int() because a version read back from JSON carries as a float
@@ -255,9 +255,9 @@ func _from_dict(data):
 	if not _check_number(saved_inertia, "DTDAKMeans", "inertia"):
 		return false
 	var saved_scaler = DTDAScaler.new()
-	if not saved_scaler._from_dict(data.get("scaler", {})):
+	if not saved_scaler.from_dict(data.get("scaler", {})):
 		return false
-	# _predict() scales a row and then measures it against the centres, so a scaler
+	# predict() scales a row and then measures it against the centres, so a scaler
 	# of one width and centres of another would read past the end of one of them
 	if saved_scaler.offsets.size() != saved_centroids[0].size():
 		push_error("DTDAKMeans: the saved scaler holds %d columns and the centres %d" % [saved_scaler.offsets.size(), saved_centroids[0].size()])
@@ -270,5 +270,35 @@ func _from_dict(data):
 	n = saved_centroids[0].size()
 	scaler = saved_scaler
 	return true
+
+
+# === The older names === #
+# Every method above used to carry a leading underscore, which in Godot marks a
+# method as virtual or private: the engine calls _ready() and _process(), you do not.
+# The names below are the ones that shipped, kept working so nothing that already
+# calls them breaks. They only forward. Prefer the ones without the underscore.
+
+func _set_seed(value):
+	return set_seed(value)
+
+func _reset():
+	return reset()
+
+func _fit(newX):
+	return fit(newX)
+
+func _predict(newX):
+	return predict(newX)
+
+func _fit_predict(newX):
+	return fit_predict(newX)
+
+func _inertia_of(newX):
+	return inertia_of(newX)
+
+func _get_centroids():
+	return get_centroids()
+
+
 
 # === End K-Means === #
