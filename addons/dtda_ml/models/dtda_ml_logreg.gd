@@ -17,21 +17,24 @@ func _init(newRate: float, newIterations: int) -> void:
 	rate = newRate
 	iterations = newIterations
 
-func _update_weights(i: int) -> void:
-	var a = _sigmoid(X, W, b)
-	
+# one round of the descent, on the weights the work is holding rather than the ones
+# the model is still answering with
+func _update_weights(work: Dictionary) -> void:
+	var rows = work["X"]
+	var a = _sigmoid(rows, work["W"], work["b"])
+
 	# gradients
-	var tmp = _substract_arrays(a, _transpose_simple_array(Y))
-	var dotW = _dot_product(_transpose_array(X), tmp)
-	var dW = _divide_array_coef(dotW, m)
-	var dB = _sum_array(tmp) / m
-	
+	var tmp = _substract_arrays(a, _transpose_simple_array(work["Y"]))
+	var dotW = _dot_product(_transpose_array(rows), tmp)
+	var dW = _divide_array_coef(dotW, work["m"])
+	var dB = _sum_array(tmp) / float(work["m"])
+
 	# update
 	var dWrate = _multiply_array_coef(dW, rate)
-	W = _substract_arrays(W, dWrate)
-	b = b - (rate * dB)
+	work["W"] = _substract_arrays(work["W"], dWrate)
+	work["b"] = work["b"] - (rate * dB)
 
-func fit(newX, newY) -> bool:
+func fit_begin(newX, newY) -> bool:
 	# The rows are weighed before a single field is written: a fit that took them as
 	# they came would leave a working model holding a nan, or half rewritten by a
 	# raise in the middle. Answers false when it refuses, true when it fitted
@@ -42,18 +45,50 @@ func fit(newX, newY) -> bool:
 	# the descent computes with the label itself, so it has to be a number
 	if not _check_number_array(newY, "DTDALogReg", "labels"):
 		return false
-	m = newX.size()
-	n = newX[0].size()
-	W = _array_zeros(n)
-	b = 0
+	# the slice is one round of the descent, and the rounds run on their own copy:
+	# a training abandoned halfway leaves the model with the weights it already had
 	# standardized features, otherwise exp() overflows as soon as the data gets large
-	scaler = DTDAScaler.new()
-	X = scaler.fit_transform(newX)
-	Y = newY
-
-	for i in iterations:
-		_update_weights(i)
+	var pending := DTDAScaler.new()
+	_fit_work = {
+		"m": newX.size(),
+		"n": newX[0].size(),
+		"W": _array_zeros(newX[0].size()),
+		"b": 0.0,
+		"X": pending.fit_transform(newX),
+		"Y": newY,
+		"scaler": pending,
+		"round": 0,
+	}
 	return true
+
+func _model_name() -> String:
+	return "DTDALogReg"
+
+func fit_step() -> float:
+	if _fit_work == null:
+		push_error("DTDALogReg: fit_step() called with no training under way")
+		return 1.0
+	var work: Dictionary = _fit_work
+	if int(work["round"]) < iterations:
+		_update_weights(work)
+		work["round"] = int(work["round"]) + 1
+	if int(work["round"]) < iterations:
+		return float(work["round"]) / float(iterations)
+	m = work["m"]
+	n = work["n"]
+	W = work["W"]
+	b = work["b"]
+	X = work["X"]
+	Y = work["Y"]
+	scaler = work["scaler"]
+	_fit_work = null
+	return 1.0
+
+# training in one go: begin, then step until there is nothing left
+func fit(newX, newY) -> bool:
+	if not fit_begin(newX, newY):
+		return false
+	return _fit_every_step()
 
 func _sigmoid(newX, newW, newB) -> Array:
 	# 1/(1 + e(-(x.dot(w) + b)

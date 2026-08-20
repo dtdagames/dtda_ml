@@ -17,7 +17,7 @@ func _init(learning_rate: float = 0.01, lambda_param: float = 0.01, n_iters: int
 	lambda = lambda_param
 	iter = n_iters
 
-func fit(newX, newY) -> bool:
+func fit_begin(newX, newY) -> bool:
 	# The rows are weighed before a single field is written: a fit that took them as
 	# they came would leave a working model holding a nan, or half rewritten by a
 	# raise in the middle. Answers false when it refuses, true when it fitted
@@ -28,39 +28,76 @@ func fit(newX, newY) -> bool:
 	# the descent multiplies by the label, so it has to be a number
 	if not _check_number_array(newY, "DTDASVM", "labels"):
 		return false
-	m = newX.size()
-	n = newX[0].size()
-
+	# the slice is one pass over the rows, and the passes run on their own copy:
+	# a training abandoned halfway leaves the model with the weights it already had
 	# standardized features, the descent is unstable otherwise
-	scaler = DTDAScaler.new()
-	var X: Array = scaler.fit_transform(newX)
-	var y2: Array = _normalize_negative(newY)
-
-	# list zeros
-	W = []
-	for i in n:
-		W.push_back(0)
-	b = 0
-
-	# gradient
-	for a in range(iter):
-		for i in X.size():
-			var dotXW: Array = _dot_product_simple(X[i], W)
-			var dotXWb: Array = _sub_arrays_const(dotXW, b)
-			var ti: Array = _multiply_array_coef(dotXWb, y2[i])
-			
-			if ti[0] >= 1:
-				var coefLW: Array = _multiply_array_coef(W, 2.0 * lambda)
-				var coefLR: Array = _multiply_array_coef(coefLW, lr)
-				W = _substract_arrays(W, coefLR)
-			else:
-				var coefXY: Array = _multiply_array_coef(X[i], y2[i])
-				var coefLW: Array = _multiply_array_coef(W, 2.0 * lambda)
-				var subLWXY: Array = _substract_arrays(coefLW, coefXY)
-				var coefLR: Array = _multiply_array_coef(subLWXY, lr)
-				W = _substract_arrays(W, coefLR)
-				b = b - (lr*y2[i])
+	var pending := DTDAScaler.new()
+	var start_W: Array = []
+	for i in newX[0].size():
+		start_W.push_back(0)
+	_fit_work = {
+		"m": newX.size(),
+		"n": newX[0].size(),
+		"W": start_W,
+		"b": 0.0,
+		"X": pending.fit_transform(newX),
+		"y2": _normalize_negative(newY),
+		"scaler": pending,
+		"round": 0,
+	}
 	return true
+
+func _model_name() -> String:
+	return "DTDASVM"
+
+func fit_step() -> float:
+	if _fit_work == null:
+		push_error("DTDASVM: fit_step() called with no training under way")
+		return 1.0
+	var work: Dictionary = _fit_work
+	if int(work["round"]) < iter:
+		_one_pass(work)
+		work["round"] = int(work["round"]) + 1
+	if int(work["round"]) < iter:
+		return float(work["round"]) / float(iter)
+	m = work["m"]
+	n = work["n"]
+	W = work["W"]
+	b = work["b"]
+	scaler = work["scaler"]
+	_fit_work = null
+	return 1.0
+
+# training in one go: begin, then step until there is nothing left
+func fit(newX, newY) -> bool:
+	if not fit_begin(newX, newY):
+		return false
+	return _fit_every_step()
+
+# one pass over every row, on the weights the work is holding
+func _one_pass(work: Dictionary) -> void:
+	var X = work["X"]
+	var y2 = work["y2"]
+	var W = work["W"]
+	var b = work["b"]
+	for i in X.size():
+		var dotXW: Array = _dot_product_simple(X[i], W)
+		var dotXWb: Array = _sub_arrays_const(dotXW, b)
+		var ti: Array = _multiply_array_coef(dotXWb, y2[i])
+		
+		if ti[0] >= 1:
+			var coefLW: Array = _multiply_array_coef(W, 2.0 * lambda)
+			var coefLR: Array = _multiply_array_coef(coefLW, lr)
+			W = _substract_arrays(W, coefLR)
+		else:
+			var coefXY: Array = _multiply_array_coef(X[i], y2[i])
+			var coefLW: Array = _multiply_array_coef(W, 2.0 * lambda)
+			var subLWXY: Array = _substract_arrays(coefLW, coefXY)
+			var coefLR: Array = _multiply_array_coef(subLWXY, lr)
+			W = _substract_arrays(W, coefLR)
+			b = b - (lr*y2[i])
+	work["W"] = W
+	work["b"] = b
 
 func predict(newX) -> Array:
 	if not _check_fitted("DTDASVM", W):
