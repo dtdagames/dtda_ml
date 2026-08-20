@@ -4,16 +4,17 @@
 DTDA ML allows you to run machine learning models like KNN, Linear Regression, Logistic Regression, SVM
 
 
-7 models are currently available:
+8 models are currently available:
 - KNN
 - Linear Regression
 - Logistic Regression
 - SVM
 - Decision Tree
 - Random Forest
+- K-Means
 - Q-Learning
 
-The six supervised ones can be scored with the usual metrics, and every model can be saved to a JSON file to be reloaded later.
+The six supervised ones can be scored with the usual metrics. K-Means has no labels to be scored against and reports its inertia instead. Every model can be saved to a JSON file to be reloaded later.
 
 
 === Running the tests ===
@@ -101,11 +102,11 @@ Example:
 Every model can be written to a JSON file and read back, so you can train once and ship the weights with your game instead of retraining at every launch.
 _save(path) returns true on success, _load(path) fills a model you just created. Both report a clear error and return false on failure, and _load() refuses a file holding a different kind of model.
 
-A file lives in user://, where a player can edit it, so _load() checks what it reads before believing it. What is checked is what a prediction computes with: the weights and the intercept of a regression or an SVM, the neighbour count and the training rows of a KNN, the offsets and scales of a scaler, the list of trees of a forest, the q values of an agent. A text where a number belongs, a list that is empty or shorter than the one it goes with, a scale of zero that every prediction would divide by, a neighbour count below one: each of those answers false with an error.
+A file lives in user://, where a player can edit it, so _load() checks what it reads before believing it. What is checked is what a prediction computes with: the weights and the intercept of a regression or an SVM, the neighbour count and the training rows of a KNN, the offsets and scales of a scaler, the list of trees of a forest, the centres and the inertia of a K-Means, the q values of an agent. A text where a number belongs, a list that is empty or shorter than the one it goes with, a scale of zero that every prediction would divide by, a neighbour count below one: each of those answers false with an error.
 
 What is not checked, and it is worth knowing: the inside of a decision tree. _load() makes sure the root is a node, then takes the branches as they come, so a tree whose nodes have been rewritten by hand can load and answer nonsense without complaining. Neither is the mode of a forest, which every prediction reads to decide between a vote and a mean: a text there is read as a vote, so a regression forest can come back answering like a classifier, and it does so in silence. Neither are the settings only _fit() reads, such as the learning rate or the number of rounds: a wrong one there costs nothing until you train again.
 
-A file that is refused changes nothing, in any of the seven models: one that was working goes on working, with the weights and the settings it already had.
+A file that is refused changes nothing, in any of the eight models: one that was working goes on working, with the weights and the settings it already had.
 
 Use a user:// path: res:// is read only once the game is exported.
 
@@ -220,6 +221,41 @@ Example:
 - forest._save("user://forest.json")
 
 A word on what to expect: on a small test set, a single forest can land level with a single tree by luck, one row being worth a couple of points. The gain is real but it is an average. The examples scene and the test suite both measure it over five seeds rather than one, and so should you.
+
+=== K-Means Model ===
+
+Use DTDAKMeans.new() to create a new model. It is the only one here that is given no labels: _fit(X) is handed rows and nothing else, and works out which of k groups each row belongs to. Reach for it to sort things you have not named yourself, spawn points into territories, players into playstyles, tiles into biomes.
+
+DTDAKMeans.new(k, max_iterations, num_runs) takes:
+- k : how many groups to look for, 3 by default. This is yours to choose, the model will not question it
+- max_iterations : how many passes one run may take before giving up, 100 by default. A run normally stops on its own, when no row changes group
+- num_runs : how many times to start over from a fresh set of centres, 5 by default, keeping the run with the lowest inertia
+
+What you get:
+- _predict(X) : the group each row belongs to, as an index from 0 to k-1
+- _fit_predict(X) : both at once, on the rows you are fitting
+- inertia : the sum of the squared distances from every training row to its centre, left behind by _fit()
+- _inertia_of(X) : the same measure for any other rows
+- _get_centroids() : the centres, in the unit of the training data, which is what you want to draw
+- _set_seed(value) and _reset() : as everywhere else, a run is only repeatable once it has a seed
+
+Distances are euclidean, so a column counted in tens of thousands would drown a column counted in units. The rows are standardised internally, the way DTDALinReg does it: you do not have to scale anything, and multiplying a column by a thousand does not change the answer.
+
+Where the centres start decides where they end, and a poor start stays poor: it is not noise that averages out over the iterations. Both usual answers are built in. k-means++ draws the first centre among the rows, then each of the others with a weight of its squared distance to the nearest centre already chosen, so the starts spread out instead of huddling. On top of that, num_runs starts are tried and the tightest is kept. On four blobs strung along a line, eight runs beat a single one on fifty five seeds out of sixty, and never did worse.
+
+Inertia falls as k rises whatever the grouping is worth, right down to zero when k reaches the number of rows. It cannot be read as a score on its own: it is read across several k on the same data, for where it stops falling sharply.
+
+Example:
+- var kmeans = DTDAKMeans.new(3)
+- kmeans._set_seed(1)
+- print("Groups: ", kmeans._fit_predict(positions))
+- print("Centres: ", kmeans._get_centroids())
+- for k in range(1, 6): #where does it stop falling
+-     var trial = DTDAKMeans.new(k)
+-     trial._set_seed(1)
+-     trial._fit(positions)
+-     print(k, " groups, inertia ", trial.inertia)
+- kmeans._save("user://camps.json")
 
 === Q-Learning Model ===
 

@@ -45,6 +45,7 @@ func _ready():
 	_svm_example()
 	_tree_example()
 	_forest_example()
+	_kmeans_example()
 	_qlearning_example()
 	_scaler_example()
 	_metrics_example()
@@ -199,6 +200,41 @@ func _forest_example():
 	regressor._fit(X_lin, y_lin)
 	print("Forest regression: ", regressor._predict([[7.2], [9.0], [11.1]]))
 	print("Forest R2: ", mltools._r2_score(regressor._predict(X_lin), y_lin))
+
+# The one model here that is given no labels at all: it is handed positions on a map
+# and works out which camp each one belongs to. Three camps are planted below and
+# nothing says so, K-Means has to find them.
+func _kmeans_rows():
+	var camps = [[0.0, 0.0], [40.0, 5.0], [20.0, 35.0]]
+	var X = []
+	for c in camps.size():
+		for j in 8:
+			var i = c * 8 + j
+			X.push_back([camps[c][0] + ((i * 7) % 5) * 1.5 - 3.0,
+				camps[c][1] + ((i * 11) % 5) * 1.5 - 3.0])
+	return X
+
+func _kmeans_example():
+	var X = _kmeans_rows()
+	var kmeans = DTDAKMeans.new(3)
+	# a seed, so this example prints the same fit every time
+	kmeans._set_seed(1)
+	print("K-Means groups: ", kmeans._fit_predict(X))
+	var camps = kmeans._get_centroids()
+	for c in camps.size():
+		print("K-Means camp ", c, " at: ", snapped(camps[c][0], 0.01), ", ", snapped(camps[c][1], 0.01))
+	print("K-Means inertia: ", snapped(kmeans.inertia, 0.001))
+
+	# how tight the grouping is for each k. Inertia always falls as k rises, so it is
+	# read for where it stops falling sharply, not for how low it goes
+	for count in range(1, 6):
+		var trial = DTDAKMeans.new(count)
+		trial._set_seed(1)
+		trial._fit(X)
+		print("K-Means with ", count, " groups, inertia ", snapped(trial.inertia, 0.001))
+
+	# a brand new spot, put with the camp it is nearest to
+	print("K-Means places a new point: ", kmeans._predict([[38.0, 6.0]]))
 
 # a corridor of six rooms: room 0 is a pit, room 5 is the exit, the agent starts in room 3
 # it learns by playing, there is no training set here
