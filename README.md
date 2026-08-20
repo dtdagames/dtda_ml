@@ -251,10 +251,10 @@ Example:
 - print("Groups: ", kmeans._fit_predict(positions))
 - print("Centres: ", kmeans._get_centroids())
 - for k in range(1, 6): #where does it stop falling
--     var trial = DTDAKMeans.new(k)
--     trial._set_seed(1)
--     trial._fit(positions)
--     print(k, " groups, inertia ", trial.inertia)
+-  var trial = DTDAKMeans.new(k)
+-  trial._set_seed(1)
+-  trial._fit(positions)
+-  print(k, " groups, inertia ", trial.inertia)
 - kmeans._save("user://camps.json")
 
 === Q-Learning Model ===
@@ -293,12 +293,12 @@ A saved agent carries the version of the format it was written in, and _load() r
 Example:
 - var agent = DTDAQLearning.new(0.2, 0.9, 1.0, 0.999, 0.1)
 - for episode in 1000:
--     var state = start_state
--     while not done:
--         var action = agent._choose_action(state, ["left", "right"])
--         #play the action, get the reward and the next state from your game
--         agent._learn(state, action, reward, next_state, ["left", "right"], done)
--         state = next_state
--     agent._decay_exploration()
+-  var state = start_state
+-  while not done:
+-   var action = agent._choose_action(state, ["left", "right"])
+-   #play the action, get the reward and the next state from your game
+-   agent._learn(state, action, reward, next_state, ["left", "right"], done)
+-   state = next_state
+-   agent._decay_exploration()
 - agent._save("user://agent.json")
 - print("Best move: ", agent._predict(state)) #no exploration left, the learned policy
