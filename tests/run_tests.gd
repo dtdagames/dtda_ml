@@ -112,8 +112,20 @@ func check_equal(name, got, expected):
 	else:
 		_fail(name, "got %s, expected %s" % [got, expected])
 
+# A nan carries a numeric type and is not a number anything can be measured against:
+# every comparison with it answers false, so a check written as "too far apart" reads
+# it as "close enough" and lets it through. It is what a 0/0 or an inf minus an inf
+# leaves behind, which eight models computing in floating point can produce, so it is
+# turned away here rather than in each of the callers: the blindness this replaces was
+# a guard added against null that nobody thought to widen.
+# _same() reads this too and is not moved by it, a nan already failing there: it is
+# equal to nothing, itself included
 func _is_number(value):
-	return typeof(value) == TYPE_INT or typeof(value) == TYPE_FLOAT
+	if typeof(value) == TYPE_INT:
+		return true
+	if typeof(value) != TYPE_FLOAT:
+		return false
+	return not is_nan(value)
 
 # "" when the two values are close enough, the reason of the failure otherwise.
 # the rule lives apart from check_near() so it can be tested without going
@@ -122,7 +134,12 @@ func _is_number(value):
 func _near_reason(got, expected, tolerance):
 	if not _is_number(got) or not _is_number(expected):
 		return "got %s, expected a number near %s" % [got, expected]
-	if abs(got - expected) > tolerance:
+	var apart = abs(got - expected)
+	# two infinities are not any distance apart, they leave a nan behind, and the
+	# comparison below would read that nan as close enough
+	if is_nan(apart):
+		return "got %s, expected %s, which cannot be measured apart" % [got, expected]
+	if apart > tolerance:
 		return "got %s, expected %s (+/- %s)" % [got, expected, tolerance]
 	return ""
 
@@ -140,9 +157,9 @@ func _near_array_reason(got, expected, tolerance):
 	if got.size() != expected.size():
 		return "got %d values, expected %d" % [got.size(), expected.size()]
 	for i in got.size():
-		if not _is_number(got[i]) or not _is_number(expected[i]):
-			return "got %s, expected an array of numbers like %s" % [got, expected]
-		if abs(got[i] - expected[i]) > tolerance:
+		# every element through the very rule check_near() uses, rather than a second
+		# copy of it: one copy is how the two came to disagree about a nan
+		if _near_reason(got[i], expected[i], tolerance) != "":
 			return "got %s, expected %s (+/- %s)" % [got, expected, tolerance]
 	return ""
 

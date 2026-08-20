@@ -137,9 +137,12 @@ func _run(t):
 			continue
 		# 1e-9 is far tighter than any move the iteration would still have to make on
 		# columns counted in units, and loose enough not to rest on the last bit
-		if abs(learned[c][0] - totals[0] / float(count)) > 1e-9:
-			off_centre += 1
-		elif abs(learned[c][1] - totals[1] / float(count)) > 1e-9:
+		# asked the way round that counts a centre only when it is provably on the
+		# middle: a nan answers false to every comparison, so disqualifying by "too
+		# far" would read a centre that is not a number at all as landing exactly right
+		var first_on = abs(learned[c][0] - totals[0] / float(count)) <= 1e-9
+		var second_on = abs(learned[c][1] - totals[1] / float(count)) <= 1e-9
+		if not (first_on and second_on):
 			off_centre += 1
 	t.check_equal("every centre sits on the middle of what it holds", off_centre, 0)
 
@@ -182,7 +185,9 @@ func _run(t):
 		var many = DTDAKMeans.new(4, 100, 8)
 		many._set_seed(s + 1)
 		many._fit(line)
-		if many.inertia > one.inertia + 1e-9:
+		# the same way round, and for the same reason: an inertia that is not provably
+		# no worse counts as worse, a nan included
+		if not (many.inertia <= one.inertia + 1e-9):
 			worse += 1
 		if many.inertia < one.inertia - 1e-9:
 			better += 1
