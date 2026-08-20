@@ -29,6 +29,7 @@ const TEST_SCRIPTS = [
 	"res://tests/test_forest.gd",
 	"res://tests/test_kmeans.gd",
 	"res://tests/test_names.gd",
+	"res://tests/test_stepped.gd",
 ]
 
 var passed = 0

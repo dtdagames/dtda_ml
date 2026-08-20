@@ -69,7 +69,7 @@ func _resolved_max_features(count: int) -> int:
 		return max(1, int(count / 3.0))
 	return max(1, int(sqrt(float(count))))
 
-func fit(newX, newY) -> bool:
+func fit_begin(newX, newY) -> bool:
 	# The rows are weighed before a single field is written: a fit that took them as
 	# they came would leave a working model holding a nan, or half rewritten by a
 	# raise in the middle. Answers false when it refuses, true when it fitted
@@ -86,25 +86,53 @@ func fit(newX, newY) -> bool:
 		return false
 	m = newX.size()
 	n = newX[0].size()
-	var per_split = _resolved_max_features(n)
-	var grown: Array = []
-	for i in num_trees:
-		var bag_X: Array = []
-		var bag_Y: Array = []
-		# as many rows as the set holds, drawn with replacement: some rows land in
-		# the bag twice, others not at all, which is what makes this tree its own
-		for u in m:
-			var pick = rng.randi() % m
-			bag_X.push_back(newX[pick])
-			bag_Y.push_back(newY[pick])
-		var tree = DTDATree.new(max_depth, min_samples_split, mode, per_split)
-		# each tree draws its features from a stream of ours, so the whole forest
-		# replays from a single set_seed()
-		tree.set_seed(rng.randi())
-		tree.fit(bag_X, bag_Y)
-		grown.push_back(tree)
-	trees = grown
+	# the slice is one tree: nothing is written into the forest until the last of them
+	_fit_work = {
+		"X": newX,
+		"Y": newY,
+		"per_split": _resolved_max_features(n),
+		"grown": [],
+	}
 	return true
+
+# training in one go: begin, then step until there is nothing left. Same answer as
+# it has always given, and the same one a caller stepping by hand ends up with
+func fit(newX, newY) -> bool:
+	if not fit_begin(newX, newY):
+		return false
+	return _fit_every_step()
+
+func _model_name() -> String:
+	return "DTDAForest"
+
+# one tree per call, which is the coarsest slice a forest has and the only one that
+# needs no change to DTDATree
+func fit_step() -> float:
+	if _fit_work == null:
+		push_error("DTDAForest: fit_step() called with no training under way")
+		return 1.0
+	var work: Dictionary = _fit_work
+	var newX = work["X"]
+	var newY = work["Y"]
+	var bag_X: Array = []
+	var bag_Y: Array = []
+	# as many rows as the set holds, drawn with replacement: some rows land in
+	# the bag twice, others not at all, which is what makes this tree its own
+	for u in m:
+		var pick = rng.randi() % m
+		bag_X.push_back(newX[pick])
+		bag_Y.push_back(newY[pick])
+	var tree = DTDATree.new(max_depth, min_samples_split, mode, work["per_split"])
+	# each tree draws its features from a stream of ours, so the whole forest
+	# replays from a single set_seed()
+	tree.set_seed(rng.randi())
+	tree.fit(bag_X, bag_Y)
+	work["grown"].push_back(tree)
+	if work["grown"].size() < num_trees:
+		return float(work["grown"].size()) / float(num_trees)
+	trees = work["grown"]
+	_fit_work = null
+	return 1.0
 
 # how the trees are put back together: the mean when regressing, the majority label
 # otherwise. A tie goes to the label the first tree answered, so the same forest

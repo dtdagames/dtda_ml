@@ -167,7 +167,7 @@ func _total_inertia(rows, centres) -> float:
 		total += _nearest(row, centres)[1]
 	return total
 
-func fit(newX) -> bool:
+func fit_begin(newX) -> bool:
 	# The rows are weighed before a single field is written: a fit that took them as
 	# they came would leave a working model holding a nan, or half rewritten by a
 	# raise in the middle. Answers false when it refuses, true when it fitted
@@ -184,22 +184,47 @@ func fit(newX) -> bool:
 		return false
 	m = newX.size()
 	n = newX[0].size()
-	# built aside, so a fit that never reaches the end leaves the standing model alone
-	var fitted_scaler = DTDAScaler.new()
-	var rows: Array = _packed_rows(fitted_scaler.fit_transform(newX))
-	var best = null
-	var best_inertia: float = INF
-	for run in num_runs:
-		var centres = _one_run(rows)
-		var run_inertia: float = _total_inertia(rows, centres)
-		# strict, so the first of two equally good runs is the one kept
-		if run_inertia < best_inertia:
-			best = centres
-			best_inertia = run_inertia
-	scaler = fitted_scaler
-	centroids = _plain_rows(best)
-	inertia = best_inertia
+	# the slice is one run from one set of starts. Built aside, so a training that
+	# never reaches the end leaves the standing model exactly as it was
+	var fitted_scaler := DTDAScaler.new()
+	_fit_work = {
+		"rows": _packed_rows(fitted_scaler.fit_transform(newX)),
+		"scaler": fitted_scaler,
+		"best": null,
+		"best_inertia": INF,
+		"run": 0,
+	}
 	return true
+
+func _model_name() -> String:
+	return "DTDAKMeans"
+
+func fit_step() -> float:
+	if _fit_work == null:
+		push_error("DTDAKMeans: fit_step() called with no training under way")
+		return 1.0
+	var work: Dictionary = _fit_work
+	if int(work["run"]) < num_runs:
+		var centres = _one_run(work["rows"])
+		var run_inertia: float = _total_inertia(work["rows"], centres)
+		# strict, so the first of two equally good runs is the one kept
+		if run_inertia < float(work["best_inertia"]):
+			work["best"] = centres
+			work["best_inertia"] = run_inertia
+		work["run"] = int(work["run"]) + 1
+	if int(work["run"]) < num_runs:
+		return float(work["run"]) / float(num_runs)
+	scaler = work["scaler"]
+	centroids = _plain_rows(work["best"])
+	inertia = work["best_inertia"]
+	_fit_work = null
+	return 1.0
+
+# training in one go: begin, then step until there is nothing left
+func fit(newX) -> bool:
+	if not fit_begin(newX):
+		return false
+	return _fit_every_step()
 
 func predict(newX) -> Array:
 	if not _check_fitted("DTDAKMeans", centroids):

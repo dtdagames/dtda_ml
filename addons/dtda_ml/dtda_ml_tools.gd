@@ -1,5 +1,47 @@
 class_name DTDATools
 
+# === Training a slice at a time === #
+# fit() runs to the end before it returns, which on a forest of 25 trees is several
+# seconds: a frozen frame, and a game cannot afford one. The same training can be
+# taken a slice at a time instead, one call per frame:
+#
+#   if model.fit_begin(X, y):
+#       while model.is_fitting():
+#           var done: float = model.fit_step()   # one slice, 0.0 to 1.0
+#
+# fit() is that loop and nothing more, so every model answers exactly what it always
+# did, and every assertion that calls fit() is exercising the stepping underneath.
+#
+# Nothing is written into the model until the last slice: the work in progress lives
+# here, apart, so a training that is abandoned or cancelled halfway leaves the model
+# it was going to replace exactly as it was. Either the old one whole or the new one
+# whole, never a half of each. It is the invariant that governs a refused fit and a
+# refused file, applied to time.
+var _fit_work = null
+
+func is_fitting() -> bool:
+	return _fit_work != null
+
+# throw the work away; the model is the one it was before fit_begin()
+func fit_cancel() -> void:
+	_fit_work = null
+
+# a model that has no stepped training says so rather than looping for ever
+func fit_step() -> float:
+	push_error("%s: this model trains in one go, it has no fit_step()" % _model_name())
+	_fit_work = null
+	return 1.0
+
+# the name a model answers to, for the messages above
+func _model_name() -> String:
+	return "DTDATools"
+
+# what fit() is: begin, then step until there is nothing left
+func _fit_every_step() -> bool:
+	while is_fitting():
+		fit_step()
+	return true
+
 # shared check for every function comparing predictions to expected labels
 func _check_pair(caller: String, y_pred, y_test) -> bool:
 	if y_pred.size() == 0:
