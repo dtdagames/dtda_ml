@@ -158,6 +158,12 @@ func _choose_action(state, valid_actions):
 # next_actions restricts what the agent may do next, leave it out to look at
 # everything already known about next_state
 func _learn(state, action, reward, next_state, next_actions = [], done = false):
+	# the reward lands straight in the table and is compared against every other q
+	# value from then on. A nan there answers false to every comparison, so _predict()
+	# stops being able to name a best action for that state at all. Answers null when
+	# it refuses, and the cell keeps the value it had
+	if not _check_number(reward, "DTDAQLearning", "reward"):
+		return null
 	if q_table == null:
 		q_table = {}
 	var state_key = _key(state)

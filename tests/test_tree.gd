@@ -21,7 +21,7 @@ const DATA_LOGR = [
 ]
 
 # how many assertions this suite runs, checked by the runner
-const PLAN = 33
+const PLAN = 38
 
 # write a handmade file and hand it to a model, for the guards on the file itself
 func _load_written(content, model):
@@ -164,6 +164,33 @@ func _run(t):
 	t.check_equal("no draw among two hundred repeats a feature", repeated, 0)
 	t.check_equal("every one of them hands back as many as asked", miscounted, 0)
 	t.check_equal("and never a feature that does not exist", out_of_range, 0)
+
+	t.section("Decision tree, a fit that is refused changes nothing")
+	# _fit() is handed whatever the caller computed, no file involved. Four faults, so
+	# the invariant does not hang on one of them
+	var zero = 0.0
+	var nan_row = [[1.0, 2.0], [2.0, 1.0], [8.0, zero / zero]]
+	var inf_row = [[1.0, 2.0], [2.0, 1.0], [8.0, 1.0 / zero]]
+	var text_row = [[1.0, 2.0], [2.0, 1.0], [8.0, "nope"]]
+	var ragged = [[1.0, 2.0], [2.0], [8.0, 9.0]]
+	var three = [0, 1, 1]
+	var sound_rows = [[1.0, 2.0], [2.0, 1.0], [8.0, 9.0]]
+	var steady = DTDATree.new(3, 2, DTDATree.CLASSIFIER)
+	steady._fit(X_log, y_log)
+	var steady_before = steady._predict(X_log)
+	t.check_equal("a tree refuses a row holding a nan", steady._fit(nan_row, three), false)
+	t.check_equal("a tree refuses more rows than labels", steady._fit(sound_rows, [0]), false)
+	steady._fit(inf_row, three)
+	steady._fit(text_row, three)
+	steady._fit(ragged, three)
+	t.check_near_array("a tree predicts what it predicted before those four",
+		steady._predict(X_log), steady_before)
+	# a leaf answers the mean when regressing, so the labels are numbers there, and
+	# only there: a classifier counts them and a class can be named
+	t.check_equal("a regressor tree refuses labels that are not numbers",
+		DTDATree.new(3, 2, DTDATree.REGRESSOR)._fit([[1.0], [2.0]], ["red", "blue"]), false)
+	t.check_equal("a classifier takes labels that name a class",
+		DTDATree.new(3, 2, DTDATree.CLASSIFIER)._fit([[1.0], [2.0]], ["red", "blue"]), true)
 
 	t.section("Decision tree, saving and loading")
 	var path = "user://dtda_ml_test_tree.json"

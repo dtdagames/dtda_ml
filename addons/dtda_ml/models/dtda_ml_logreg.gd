@@ -32,6 +32,16 @@ func _update_weights(i):
 	b = b - (rate * dB)
 
 func _fit(newX, newY):
+	# The rows are weighed before a single field is written: a fit that took them as
+	# they came would leave a working model holding a nan, or half rewritten by a
+	# raise in the middle. Answers false when it refuses, true when it fitted
+	if not _check_matrix(newX, "DTDALogReg"):
+		return false
+	if not _check_labels(newX, newY, "DTDALogReg"):
+		return false
+	# the descent computes with the label itself, so it has to be a number
+	if not _check_number_array(newY, "DTDALogReg", "labels"):
+		return false
 	m = newX.size()
 	n = newX[0].size()
 	W = _array_zeros(n)
@@ -43,6 +53,7 @@ func _fit(newX, newY):
 
 	for i in iterations:
 		_update_weights(i)
+	return true
 
 func _sigmoid(newX, newW, newB):
 	# 1/(1 + e(-(x.dot(w) + b)
