@@ -116,7 +116,7 @@ Example:
 - linreg._save("user://linreg.json")
 - var loaded = DTDALinReg.new(0.01, 1000) #a brand new model, never fitted
 - if loaded._load("user://linreg.json"):
--     print("Prediction: ", loaded._predict(X_test)) #same results as the saved model
+-  print("Prediction: ", loaded._predict(X_test)) #same results as the saved model
 
 === KNN Model ===
 
