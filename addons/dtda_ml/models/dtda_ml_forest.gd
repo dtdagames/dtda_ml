@@ -22,21 +22,21 @@ const REGRESSOR = DTDATree.REGRESSOR
 
 const FORMAT_VERSION = 1
 
-var num_trees
-var max_depth
-var min_samples_split
-var mode
-var max_features
-var m
-var n
+var num_trees: int
+var max_depth: int
+var min_samples_split: int
+var mode: int
+var max_features: int
+var m: int = 0
+var n: int = 0
 # the trees themselves, null until fit()
 var trees
 # its own generator, so a run can be replayed with set_seed()
-var rng
+var rng: RandomNumberGenerator
 # the seed given to set_seed(), replayed by reset(), null when none was asked for
 var start_seed
 
-func _init(forest_num_trees := 10, forest_max_depth := 5, forest_min_samples_split := 2, forest_mode := CLASSIFIER, forest_max_features := 0):
+func _init(forest_num_trees: int = 10, forest_max_depth: int = 5, forest_min_samples_split: int = 2, forest_mode: int = CLASSIFIER, forest_max_features: int = 0) -> void:
 	num_trees = forest_num_trees
 	max_depth = forest_max_depth
 	min_samples_split = forest_min_samples_split
@@ -47,12 +47,12 @@ func _init(forest_num_trees := 10, forest_max_depth := 5, forest_min_samples_spl
 
 # fix the draws, for a reproducible forest
 # reset() puts the generator back on that same seed
-func set_seed(value):
+func set_seed(value: int) -> void:
 	start_seed = value
 	rng.seed = value
 
 # forget the trees and put the generator back where it started
-func reset():
+func reset() -> void:
 	trees = null
 	if start_seed != null:
 		rng.seed = start_seed
@@ -61,7 +61,7 @@ func reset():
 # the square root of the count when classifying, a third of it when regressing.
 # Passing the full count turns the forest into plain bagging, which is a fair thing
 # to want and a poor default, the trees then being nearly the same tree
-func _resolved_max_features(count):
+func _resolved_max_features(count: int) -> int:
 	if max_features > 0:
 		return min(max_features, count)
 	if mode == REGRESSOR:
@@ -69,7 +69,7 @@ func _resolved_max_features(count):
 		return max(1, int(count / 3.0))
 	return max(1, int(sqrt(float(count))))
 
-func fit(newX, newY):
+func fit(newX, newY) -> bool:
 	# The rows are weighed before a single field is written: a fit that took them as
 	# they came would leave a working model holding a nan, or half rewritten by a
 	# raise in the middle. Answers false when it refuses, true when it fitted
@@ -87,10 +87,10 @@ func fit(newX, newY):
 	m = newX.size()
 	n = newX[0].size()
 	var per_split = _resolved_max_features(n)
-	var grown = []
+	var grown: Array = []
 	for i in num_trees:
-		var bag_X = []
-		var bag_Y = []
+		var bag_X: Array = []
+		var bag_Y: Array = []
 		# as many rows as the set holds, drawn with replacement: some rows land in
 		# the bag twice, others not at all, which is what makes this tree its own
 		for u in m:
@@ -123,14 +123,14 @@ func _combine(answers):
 			best_count = counts[value]
 	return winner
 
-func predict(newX):
+func predict(newX) -> Array:
 	if not _check_fitted("DTDAForest", trees):
 		return []
 	# every tree answers the whole batch, then each row is settled across the trees
-	var answers = []
+	var answers: Array = []
 	for tree in trees:
 		answers.push_back(tree.predict(newX))
-	var pred = []
+	var pred: Array = []
 	for i in newX.size():
 		var row = []
 		for tree_answers in answers:
@@ -138,7 +138,7 @@ func predict(newX):
 		pred.push_back(_combine(row))
 	return pred
 
-func to_dict():
+func to_dict() -> Dictionary:
 	if not _check_fitted("DTDAForest", trees, "save()"):
 		return {}
 	var saved = []
@@ -156,7 +156,7 @@ func to_dict():
 		"trees": saved,
 	}
 
-func from_dict(data):
+func from_dict(data) -> bool:
 	if not _check_model_name(data, "DTDAForest"):
 		return false
 	# int() because a version read back from JSON carries as a float
@@ -201,10 +201,10 @@ func from_dict(data):
 # calls them breaks. They only forward. Prefer the ones without the underscore.
 
 func _set_seed(value):
-	return set_seed(value)
+	set_seed(value)
 
 func _reset():
-	return reset()
+	reset()
 
 func _fit(newX, newY):
 	return fit(newX, newY)

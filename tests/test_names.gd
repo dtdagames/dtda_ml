@@ -48,8 +48,7 @@ func _run(t):
 
 	t.section("Names, the scaler")
 	var scaler = DTDAScaler.new()
-	scaler._fit(X)
-	t.check("_fit on a scaler leaves it fitted", scaler.offsets != null)
+	t.check_equal("_fit on a scaler", scaler._fit(X), true)
 	t.check_equal("_transform", scaler._transform(PROBE), scaler.transform(PROBE))
 	var other = DTDAScaler.new()
 	t.check_equal("_fit_transform", other._fit_transform(X), scaler.transform(X))

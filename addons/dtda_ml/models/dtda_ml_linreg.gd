@@ -3,10 +3,10 @@ extends DTDATools
 class_name DTDALinReg
 
 # === Linear Regression model === #
-var m
-var n
-var rate
-var iterations
+var m: int = 0
+var n: int = 0
+var rate: float
+var iterations: int
 var W
 var b
 var X
@@ -15,30 +15,30 @@ var Y
 var x_scaler
 var y_scaler
 
-func _init(newRate:float, newIterations:int):
+func _init(newRate: float, newIterations: int) -> void:
 	rate = newRate
 	iterations = newIterations
 
 # prediction in the standardized space, used by the descent
-func _predict_scaled(scaledX):
+func _predict_scaled(scaledX) -> Array:
 	var dotXW = _dot_product(scaledX, W)
 	return _add_arrays_const(dotXW, b)
 
-func _update_weights():
-	var Y_pred = _predict_scaled(X)
+func _update_weights() -> void:
+	var Y_pred: Array = _predict_scaled(X)
 	# gradients
-	var subY = _substract_arrays(Y, Y_pred)
-	var dotXY = _dot_product(_transpose_array(X), subY)
-	var dotXY2 = _multiply_array_coef(dotXY, -2)
-	var dW = _divide_array_coef(dotXY2, m)
-	var sumY = _sum_array(subY)
-	var dB =  (-2 * sumY) / m
+	var subY: Array = _substract_arrays(Y, Y_pred)
+	var dotXY: Array = _dot_product(_transpose_array(X), subY)
+	var dotXY2: Array = _multiply_array_coef(dotXY, -2)
+	var dW: Array = _divide_array_coef(dotXY2, m)
+	var sumY: float = _sum_array(subY)
+	var dB: float = (-2.0 * sumY) / float(m)
 	# update
-	var dWrate = _multiply_array_coef(dW, rate)
+	var dWrate: Array = _multiply_array_coef(dW, rate)
 	W = _substract_arrays(W, dWrate)
 	b = b - (rate * dB)
 
-func fit(newX, newY):
+func fit(newX, newY) -> bool:
 	# The rows are weighed before a single field is written: a fit that took them as
 	# they came would leave a working model holding a nan, or half rewritten by a
 	# raise in the middle. Answers false when it refuses, true when it fitted
@@ -64,7 +64,7 @@ func fit(newX, newY):
 		_update_weights()
 	return true
 
-func predict(newX):
+func predict(newX) -> Array:
 	if not _check_fitted("DTDALinReg", W):
 		return []
 	var pred = _predict_scaled(x_scaler.transform(newX))

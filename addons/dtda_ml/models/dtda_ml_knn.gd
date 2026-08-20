@@ -5,34 +5,34 @@ class_name DTDAKNN
 # === KNN model === #
 var X
 var Y
-var num_neighbors
+var num_neighbors: int
 
-func _init(n:int):
+func _init(n: int) -> void:
 	num_neighbors=n
 
-func _euclidean_distance(row1, row2):
-	var distance = 0.0
+func _euclidean_distance(row1, row2) -> float:
+	var distance: float = 0.0
 	for i in row1.size():
 		distance += (row1[i] - row2[i])**2
 	return sqrt(distance)
 
-func _get_neighbors(test_row):
-	var distances = []
-	var i = 0
+func _get_neighbors(test_row) -> Array:
+	var distances: Array = []
+	var i: int = 0
 	for train_row in X:
 		var dist = _euclidean_distance(test_row, train_row)
 		distances.push_back([i, dist])
 		i += 1
 	distances.sort_custom(func(a, b): return a[1] < b[1])
-	var neighbors = []
-	var tempNeighbors = num_neighbors
+	var neighbors: Array = []
+	var tempNeighbors: int = num_neighbors
 	if num_neighbors > X.size():
 		tempNeighbors = X.size()
 	for u in tempNeighbors:
 		neighbors.push_back(distances[u][0])
 	return neighbors
 
-func fit(newX, newY):
+func fit(newX, newY) -> bool:
 	# The rows are weighed before a single field is written: a fit that took them as
 	# they came would leave a working model holding a nan, or half rewritten by a
 	# raise in the middle. Answers false when it refuses, true when it fitted
@@ -46,11 +46,11 @@ func fit(newX, newY):
 
 # most frequent label among the neighbors, ties go to the closest one
 func _majority_vote(output_values):
-	var counts = {}
+	var counts: Dictionary = {}
 	for value in output_values:
 		counts[value] = counts.get(value, 0) + 1
 	var tempPred = output_values[0]
-	var best_count = 0
+	var best_count: int = 0
 	# output_values is ordered from the closest to the farthest neighbor,
 	# so a strict comparison keeps the closest label on equality
 	for value in output_values:
@@ -59,10 +59,10 @@ func _majority_vote(output_values):
 			best_count = counts[value]
 	return tempPred
 
-func predict(newX):
+func predict(newX) -> Array:
 	if not _check_fitted("DTDAKNN", X):
 		return []
-	var pred = []
+	var pred: Array = []
 	for i in newX.size():
 		var neighbors = _get_neighbors(newX[i])
 		var output_values = []

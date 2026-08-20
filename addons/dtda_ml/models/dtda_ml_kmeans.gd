@@ -22,11 +22,11 @@ class_name DTDAKMeans
 
 const FORMAT_VERSION = 1
 
-var k
-var max_iterations
-var num_runs
-var m
-var n
+var k: int
+var max_iterations: int
+var num_runs: int
+var m: int = 0
+var n: int = 0
 # the centres, in the scaled space the model works in, null until fit()
 var centroids
 # the sum of the squared distances from every training row to its centre. Without
@@ -34,11 +34,11 @@ var centroids
 var inertia
 var scaler
 # its own generator, so a run can be replayed with set_seed()
-var rng
+var rng: RandomNumberGenerator
 # the seed given to set_seed(), replayed by reset(), null when none was asked for
 var start_seed
 
-func _init(kmeans_k := 3, kmeans_max_iterations := 100, kmeans_num_runs := 5):
+func _init(kmeans_k: int = 3, kmeans_max_iterations: int = 100, kmeans_num_runs: int = 5) -> void:
 	k = kmeans_k
 	max_iterations = kmeans_max_iterations
 	num_runs = kmeans_num_runs
@@ -47,12 +47,12 @@ func _init(kmeans_k := 3, kmeans_max_iterations := 100, kmeans_num_runs := 5):
 
 # fix the draws, for a reproducible fit
 # reset() puts the generator back on that same seed
-func set_seed(value):
+func set_seed(value: int) -> void:
 	start_seed = value
 	rng.seed = value
 
 # forget the centres and put the generator back where it started
-func reset():
+func reset() -> void:
 	centroids = null
 	inertia = null
 	if start_seed != null:
@@ -60,18 +60,18 @@ func reset():
 
 # squared, because the square root would change neither which centre is nearest nor
 # the order of two distances, and inertia is defined on the squares anyway
-func _square_distance(row, centre):
-	var total = 0.0
+func _square_distance(row, centre) -> float:
+	var total: float = 0.0
 	for i in centre.size():
 		total += (row[i] - centre[i]) ** 2
 	return total
 
 # which centre a scaled row belongs to, and how far it sits from it
-func _nearest(row, centres):
-	var best = 0
-	var best_distance = INF
+func _nearest(row, centres) -> Array:
+	var best: int = 0
+	var best_distance: float = INF
 	for i in centres.size():
-		var distance = _square_distance(row, centres[i])
+		var distance: float = _square_distance(row, centres[i])
 		# strict, so a tie keeps the lower index and the same row always answers
 		# the same group
 		if distance < best_distance:
@@ -84,13 +84,13 @@ func _nearest(row, centres):
 # chosen. A row that is already a centre weighs zero, so the draw never returns it a
 # second time, and rows far from everything chosen so far come up often. The fallback
 # further down is the one exception, and it is not a draw
-func _initial_centroids(rows):
+func _initial_centroids(rows) -> Array:
 	var centres = [rows[rng.randi() % rows.size()].duplicate()]
 	while centres.size() < k:
-		var weights = []
-		var total = 0.0
+		var weights: Array = []
+		var total: float = 0.0
 		for row in rows:
-			var weight = _nearest(row, centres)[1]
+			var weight: float = _nearest(row, centres)[1]
 			weights.push_back(weight)
 			total += weight
 		# every row sits exactly on a centre already, which happens when the data
@@ -102,8 +102,8 @@ func _initial_centroids(rows):
 					break
 				centres.push_back(row.duplicate())
 			break
-		var target = rng.randf() * total
-		var running = 0.0
+		var target: float = rng.randf() * total
+		var running: float = 0.0
 		# the last row is the fallback: floating point can leave the running sum a
 		# hair under the target on the very last step
 		var chosen = rows.size() - 1
@@ -117,13 +117,13 @@ func _initial_centroids(rows):
 
 # one run of Lloyd: put every row with its nearest centre, move every centre to the
 # middle of what it holds, and stop when nobody changed group
-func _one_run(rows):
+func _one_run(rows) -> Array:
 	var centres = _initial_centroids(rows)
-	var labels = []
+	var labels: Array = []
 	for i in rows.size():
 		labels.push_back(-1)
 	for step in max_iterations:
-		var moved = false
+		var moved: bool = false
 		for i in rows.size():
 			var nearest = _nearest(rows[i], centres)[0]
 			if nearest != labels[i]:
@@ -134,7 +134,7 @@ func _one_run(rows):
 			break
 		for c in centres.size():
 			var totals = _array_zeros(n)
-			var count = 0
+			var count: int = 0
 			for i in rows.size():
 				if labels[i] == c:
 					for u in n:
@@ -148,13 +148,26 @@ func _one_run(rows):
 				centres[c][u] = totals[u] / float(count)
 	return centres
 
-func _total_inertia(rows, centres):
-	var total = 0.0
+# a row at a time into a contiguous float array, and back again
+func _packed_rows(rows) -> Array:
+	var packed: Array = []
+	for row in rows:
+		packed.push_back(PackedFloat64Array(row))
+	return packed
+
+func _plain_rows(rows) -> Array:
+	var plain: Array = []
+	for row in rows:
+		plain.push_back(Array(row))
+	return plain
+
+func _total_inertia(rows, centres) -> float:
+	var total: float = 0.0
 	for row in rows:
 		total += _nearest(row, centres)[1]
 	return total
 
-func fit(newX):
+func fit(newX) -> bool:
 	# The rows are weighed before a single field is written: a fit that took them as
 	# they came would leave a working model holding a nan, or half rewritten by a
 	# raise in the middle. Answers false when it refuses, true when it fitted
@@ -173,49 +186,49 @@ func fit(newX):
 	n = newX[0].size()
 	# built aside, so a fit that never reaches the end leaves the standing model alone
 	var fitted_scaler = DTDAScaler.new()
-	var rows = fitted_scaler.fit_transform(newX)
+	var rows: Array = _packed_rows(fitted_scaler.fit_transform(newX))
 	var best = null
-	var best_inertia = INF
+	var best_inertia: float = INF
 	for run in num_runs:
 		var centres = _one_run(rows)
-		var run_inertia = _total_inertia(rows, centres)
+		var run_inertia: float = _total_inertia(rows, centres)
 		# strict, so the first of two equally good runs is the one kept
 		if run_inertia < best_inertia:
 			best = centres
 			best_inertia = run_inertia
 	scaler = fitted_scaler
-	centroids = best
+	centroids = _plain_rows(best)
 	inertia = best_inertia
 	return true
 
-func predict(newX):
+func predict(newX) -> Array:
 	if not _check_fitted("DTDAKMeans", centroids):
 		return []
-	var pred = []
+	var pred: Array = []
 	for row in scaler.transform(newX):
 		pred.push_back(_nearest(row, centroids)[0])
 	return pred
 
-func fit_predict(newX):
+func fit_predict(newX) -> Array:
 	fit(newX)
 	return predict(newX)
 
 # the inertia of any set of rows against the centres already learned. Lower is
 # tighter, and it only ever compares groupings of the same rows: it falls as k rises
 # whatever the grouping is worth, so it cannot be read as a score on its own
-func inertia_of(newX):
+func inertia_of(newX) -> float:
 	if not _check_fitted("DTDAKMeans", centroids, "inertia_of()"):
 		return 0.0
 	return _total_inertia(scaler.transform(newX), centroids)
 
 # the centres in the unit of the training data, rather than the scaled space the
 # model works in
-func get_centroids():
+func get_centroids() -> Array:
 	if not _check_fitted("DTDAKMeans", centroids, "get_centroids()"):
 		return []
 	return scaler.inverse_transform(centroids)
 
-func to_dict():
+func to_dict() -> Dictionary:
 	if not _check_fitted("DTDAKMeans", centroids, "save()"):
 		return {}
 	return {
@@ -229,7 +242,7 @@ func to_dict():
 		"scaler": scaler.to_dict(),
 	}
 
-func from_dict(data):
+func from_dict(data) -> bool:
 	if not _check_model_name(data, "DTDAKMeans"):
 		return false
 	# int() because a version read back from JSON carries as a float
@@ -279,10 +292,10 @@ func from_dict(data):
 # calls them breaks. They only forward. Prefer the ones without the underscore.
 
 func _set_seed(value):
-	return set_seed(value)
+	set_seed(value)
 
 func _reset():
-	return reset()
+	reset()
 
 func _fit(newX):
 	return fit(newX)
