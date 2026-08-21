@@ -9,7 +9,7 @@ There are two things people actually do with it.
 
 - var aim = DTDALinReg.new(0.01, 1000)
 - if aim.load("res://weights/aim.json"):
--     print(aim.predict([[distance, speed]]))
+- print(aim.predict([[distance, speed]]))
 
 **Learn while the game runs.** DTDAQLearning is the one model that has to live in the engine, because an agent that learns by playing cannot be trained anywhere else. It takes one transition at a time, a few microseconds each, so it costs nothing per frame.
 
@@ -128,7 +128,7 @@ A fit that is refused changes nothing: a model that was working goes on working,
 
 Example:
 - if not model.fit(X_train, y_train):
--     print("the training data was not usable, the model is untouched")
+- print("the training data was not usable, the model is untouched")
 
 === Training a slice at a time ===
 
@@ -137,9 +137,9 @@ fit() runs to the end before it returns. On two hundred rows of eight columns, a
 The same training can be taken a slice at a time instead, one call per frame:
 
 - if forest.fit_begin(X, y):
--     while forest.is_fitting():
--         var done: float = forest.fit_step()   #0.0 to 1.0, a progress bar if you want one
--         await get_tree().process_frame
+- while forest.is_fitting():
+- var done: float = forest.fit_step()   #0.0 to 1.0, a progress bar if you want one
+- await get_tree().process_frame
 
 fit() is that loop and nothing else, so a model trained in one go is the same model, to the last bit, as one stepped by hand. Existing code that calls fit() is unaffected.
 
