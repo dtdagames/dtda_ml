@@ -16,6 +16,8 @@ There are two things people actually do with it.
 - var move = agent.choose_action(state, ["left", "right"])
 - #play the move, then tell the agent how it went
 - agent.learn(state, move, reward, next_state, ["left", "right"], done)
+- #and when the episode ends, so it explores a little less from now on
+- agent.decay_exploration()
 
 Training in the game is possible for the others too, without freezing a frame: see "Training a slice at a time".
 
@@ -341,7 +343,7 @@ Epsilon is a probability: the rate and its floor are brought into [0, 1] when th
 The loop:
 - choose_action(state, valid_actions) : epsilon-greedy, picks among the actions that are legal right now. Safe to call before anything was learned, the agent then simply explores. On a state it never met every action is worth 0, so the first of the list comes out
 - learn(state, action, reward, next_state, next_actions, done) : one transition, refused with a null answer when the reward is not a real number, the cell keeping the value it had. the Bellman update Q(s, a) += lr * (reward + gamma * max Q(s', a') - Q(s, a)). Pass done = true on the last transition of an episode, a terminal state has no future to add. next_actions restricts what the agent may do next, leave it out (or pass null) to look at everything already learned about next_state
-- decay_exploration() : call it at the end of an episode, epsilon goes down one notch and never below its floor
+- decay_exploration() : call it at the end of an episode, epsilon goes down one notch and never below its floor. Nothing calls it for you, because only you know where an episode ends: an agent that never gets it learns a perfectly good table and then goes on moving at random forever, with nothing to warn you. Calling it once per step instead collapses exploration much faster than the decay you asked for suggests — on one measured run epsilon reached its floor at episode 2 rather than 388
 - predict(state, valid_actions) : the learned policy with no exploration at all, this is what you ship. valid_actions is optional, leave it out (or pass null) to pick among everything learned in that state. On a state the agent never met, or one whose row holds no action, it reports an error and answers null, with or without a list: it will not dress up a tie between zeros as a policy. Use choose_action() when you need a move no matter what
 - get_q(state, action) : the value of a pair, 0.0 when it was never met
 - set_seed(value) : fix the random draws for a reproducible run
@@ -367,6 +369,6 @@ Example:
 -   #play the action, get the reward and the next state from your game
 -   agent.learn(state, action, reward, next_state, ["left", "right"], done)
 -   state = next_state
--   agent.decay_exploration()
+-  agent.decay_exploration() #once per episode, not once per step
 - agent.save("user://agent.json")
 - print("Best move: ", agent.predict(state)) #no exploration left, the learned policy
