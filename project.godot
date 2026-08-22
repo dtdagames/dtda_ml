@@ -7,5 +7,10 @@ config_version=5
 
 config/name="dtda_ml"
 config/description="Machine learning models for Godot."
-run/main_scene="res://addons/dtda_ml/examples/examples_scene.tscn"
+run/main_scene="res://demo/qlearning_demo.tscn"
 config/features=PackedStringArray("4.3")
+
+[display]
+
+window/size/viewport_width=928
+window/size/viewport_height=580
