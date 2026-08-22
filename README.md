@@ -40,6 +40,8 @@ The six supervised ones can be scored with the usual metrics. K-Means has no lab
 
 The repository is also a small Godot project, so you can open it directly and press F6 on addons/dtda_ml/examples/examples_scene.tscn to see every model run.
 
+Two demos live in demo/ and are worth a look before anything else, since they show what the models are for rather than what they return. Running the project opens the Q-Learning one, an agent learning to cross a field of lava; press F6 on demo/turret_demo.tscn for the other, a turret that learns to aim from its own shots. Each comes with a headless script that checks what it claims: demo/verify_maze.gd and demo/verify_turret.gd.
+
 The test suite lives in tests/ and needs no framework. Run it headless from the project root:
 - godot --headless --script res://tests/run_tests.gd
 
