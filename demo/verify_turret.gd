@@ -42,10 +42,11 @@ func _initialize():
 	var miss_curved: Dictionary = world.evaluate(curved, true, test_targets)
 	var miss_none: Dictionary = world.evaluate_untrained(test_targets)
 	var reach := world.range_for(world.angle_max())
+	var nearest := world.range_for(world.angle_min())
 	print("mean miss  no model      : %6.2f m   (worst %.1f)" % [miss_none["mean"], miss_none["worst"]])
 	print("mean miss  distance only : %6.2f m   (worst %.1f)" % [miss_plain["mean"], miss_plain["worst"]])
 	print("mean miss  and square    : %6.2f m   (worst %.1f)" % [miss_curved["mean"], miss_curved["worst"]])
-	print("for reference, the turret reaches %.0f m" % reach)
+	print("the %d targets span the turret's reach, %.0f m to %.0f m" % [test_targets.size(), nearest, reach])
 
 	if miss_plain["mean"] >= miss_none["mean"] / 3.0:
 		print("FAIL  the trained turret is not clearly better than an untrained one")

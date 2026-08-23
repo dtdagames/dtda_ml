@@ -3,6 +3,14 @@
 
 Machine learning for Godot games, written in GDScript with no dependencies. It is a library rather than an editor plugin: copy `addons/dtda_ml` into your project and the classes are there, with nothing to enable.
 
+![Q-Learning: the same agent before and after training](docs/qlearning.gif)
+
+Two replays of the same agent, side by side: on the left its first episode, on the right the policy it has learned after 400. 200 steps without ever reaching the goal, then 18, which is the shortest path the arena allows.
+
+![A turret learning to aim from its own shots](docs/turret.gif)
+
+The turret is never given the ballistic formula: it fires 300 shots and adjusts. The clip follows a few of its shots; over 400 targets spread across the turret's reach, 31 m to 90 m, `demo/verify_turret.gd` measures a mean miss of 15.24 m with no model, 1.93 m from the distance alone, and 0.81 m once its square is added.
+
 There are two things people actually do with it.
 
 **Train elsewhere, ship the weights, predict at runtime.** Fit a model wherever it is convenient, save it to JSON, and load it in the game. This is the sensible route for the models that learn by gradient descent: fitting a regression inside your game is rarely what you want, loading one that is already trained is.
