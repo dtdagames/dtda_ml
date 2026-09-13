@@ -1,14 +1,10 @@
 extends Node2D
 
-# The linear regression demo: a turret that never learns the ballistic formula, only
-# the shots it took.
-#
-# Left, the three hundred rounds it fired at random angles and the two fits made from
-# them. Right, the same target engaged by both models at once. The difference between
-# the two shells is the whole argument: one feature, then the same feature squared.
-#
-# As in the Q-Learning demo, the fitting happens once in _ready(); what runs per frame
-# is only the arc of two shells.
+# The linear regression demo: a turret that never learns the ballistic formula, only the shots
+# it took. Left, the three hundred rounds it fired at random angles and the two fits made from
+# them. Right, the same target engaged by both models at once, the difference between the two
+# shells being the whole argument: one feature, then the same feature squared. As in the
+# Q-Learning demo the fitting happens once in _ready(); what runs per frame is only two arcs.
 
 const MARGIN := 28
 const TOP := 132
@@ -55,8 +51,7 @@ func _ready() -> void:
 	plain = world.fit_model(sample, false)
 	curved = world.fit_model(sample, true)
 	reach = world.range_for(world.angle_max())
-	# the span the turret actually fired over. Anything outside it is extrapolation, and
-	# drawing a fit there would show the model asserting things it never saw.
+	# the span the turret actually fired over: anything outside it is extrapolation, and drawing a fit there would show the model asserting things it never saw
 	seen_low = sample["distances"].min()
 	seen_high = sample["distances"].max()
 	_next_target()
@@ -69,8 +64,7 @@ func _next_target() -> void:
 	rounds += 1
 	total_plain += abs(world.range_for(angle_plain) - target_distance)
 	total_curved += abs(world.range_for(angle_curved) - target_distance)
-	# the untrained turret is scored on the very same target, round by round, rather than
-	# on a separate draw: three bars from three different samples would not compare
+	# the untrained turret is scored on the very same target, round by round, rather than on a separate draw: three bars from three different samples would not compare
 	var fixed := (world.angle_min() + world.angle_max()) * 0.5
 	total_untrained += abs(world.range_for(fixed) - target_distance)
 
@@ -99,16 +93,14 @@ func _draw() -> void:
 	_draw_range(font)
 	_draw_scores(font)
 
-# The training set as it is: a distance measured on the ground against the angle that
-# produced it, with the two fits laid over it.
+# The training set as it is: a distance measured on the ground against the angle that produced it, with the two fits laid over it.
 func _draw_sample(font: Font) -> void:
 	var origin := Vector2(MARGIN, TOP)
 	draw_string(font, origin + Vector2(0, -12), "What it saw, and what it fitted",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, TEXT)
 	draw_rect(Rect2(origin, Vector2(PANEL_W, PANEL_H)), PANEL)
 
-	# the axis is opened two degrees past the band on each side: a fit is free to predict
-	# slightly outside what the turret can fire, and clipping that off would hide it
+	# the axis is opened two degrees past the band on each side: a fit is free to predict slightly outside what the turret can fire, and clipping that off would hide it
 	var pad := deg_to_rad(2.0)
 	var lo := world.angle_min() - pad
 	var hi := world.angle_max() + pad
@@ -123,8 +115,7 @@ func _draw_sample(font: Font) -> void:
 	draw_polyline(line_plain, PLAIN, 2.0, true)
 	draw_polyline(line_curved, CURVED, 2.0, true)
 
-	# the shots last: a good fit sits on top of them, and a cloud drawn first would be
-	# hidden by the very lines it is there to justify
+	# the shots last: a good fit sits on top of them, and a cloud drawn first would be hidden by the very lines it is there to justify
 	for i in sample["distances"].size():
 		var d: float = sample["distances"][i]
 		var a: float = sample["angles"][i]
@@ -177,8 +168,7 @@ func _draw_shell(ground: Vector2, scale_x: float, angle: float, t: float, color:
 		draw_polyline(arc, Color(color, 0.45), 1.5, true)
 		draw_circle(arc[arc.size() - 1], 3.0, color)
 
-# The three numbers side by side, as bars: what it costs to fire without a model, with
-# one feature, and with two.
+# The three numbers side by side, as bars: what it costs to fire without a model, with one feature, and with two.
 func _draw_scores(font: Font) -> void:
 	var origin := Vector2(MARGIN, TOP + PANEL_H + 66)
 	var width := PANEL_W * 2 + GAP

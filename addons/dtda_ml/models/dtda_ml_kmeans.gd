@@ -2,23 +2,12 @@ extends DTDATools
 
 class_name DTDAKMeans
 
-# === K-Means === #
-# The first model here that learns without labels. fit() is handed rows and nothing
-# else, and works out which of k groups each row belongs to.
-#
-# Distances are euclidean, so a column counted in tens of thousands would drown a
-# column counted in units. The rows are standardised internally by a DTDAScaler, the
-# way DTDALinReg does it: nothing has to be scaled beforehand, and the unit a column
-# is written in does not change the answer. get_centroids() hands the centres back
-# in the unit of the training data, which is what a game wants to draw.
-#
-# Where the centres start decides where they end, and a poor start stays poor: it is
-# not noise that averages out over the iterations. Two well worn answers, both here:
-#  - k-means++, which draws the first centre among the rows and each of the others
-#    with a weight of its squared distance to the nearest centre already chosen, so
-#    the starts spread out instead of huddling
-#  - several runs from several starts, keeping the one with the lowest inertia
-# Both draw on one generator, so set_seed() replays a whole fit.
+# The first model here that learns without labels: fit() is handed rows and nothing else, and
+# works out which of k groups each row belongs to. Distances are euclidean, so a column in
+# tens of thousands would drown one in units: the rows are standardised internally by a
+# DTDAScaler, as DTDALinReg does, and get_centroids() hands the centres back in the unit of
+# the training data, which is what a game wants to draw. Where the centres start decides where they end, and a poor start stays poor rather than averaging out over the iterations,
+# hence k-means++ and several runs kept on the lowest inertia. Both draw on one generator, so set_seed() replays a whole fit.
 
 const FORMAT_VERSION = 1
 
@@ -27,15 +16,11 @@ var max_iterations: int
 var num_runs: int
 var m: int = 0
 var n: int = 0
-# the centres, in the scaled space the model works in, null until fit()
 var centroids
-# the sum of the squared distances from every training row to its centre. Without
-# labels to compare against it is the only measure of quality there is
+# the sum of the squared distances from every training row to its centre. Without labels to compare against it is the only measure of quality there is
 var inertia
 var scaler
-# its own generator, so a run can be replayed with set_seed()
 var rng: RandomNumberGenerator
-# the seed given to set_seed(), replayed by reset(), null when none was asked for
 var start_seed
 
 func _init(kmeans_k: int = 3, kmeans_max_iterations: int = 100, kmeans_num_runs: int = 5) -> void:
@@ -45,45 +30,38 @@ func _init(kmeans_k: int = 3, kmeans_max_iterations: int = 100, kmeans_num_runs:
 	rng = RandomNumberGenerator.new()
 	start_seed = null
 
-# fix the draws, for a reproducible fit
-# reset() puts the generator back on that same seed
+# fix the draws for a reproducible fit; reset() replays this same seed
 func set_seed(value: int) -> void:
 	start_seed = value
 	rng.seed = value
 
-# forget the centres and put the generator back where it started
 func reset() -> void:
 	centroids = null
 	inertia = null
 	if start_seed != null:
 		rng.seed = start_seed
 
-# squared, because the square root would change neither which centre is nearest nor
-# the order of two distances, and inertia is defined on the squares anyway
+# squared, because the square root would change neither which centre is nearest nor the order of two distances, and inertia is defined on the squares anyway
 func _square_distance(row, centre) -> float:
 	var total: float = 0.0
 	for i in centre.size():
 		total += (row[i] - centre[i]) ** 2
 	return total
 
-# which centre a scaled row belongs to, and how far it sits from it
 func _nearest(row, centres) -> Array:
 	var best: int = 0
 	var best_distance: float = INF
 	for i in centres.size():
 		var distance: float = _square_distance(row, centres[i])
-		# strict, so a tie keeps the lower index and the same row always answers
-		# the same group
+		# strict, so a tie keeps the lower index and the same row always answers the same group
 		if distance < best_distance:
 			best = i
 			best_distance = distance
 	return [best, best_distance]
 
-# k-means++ : the first centre is a row taken at random, then each new centre is drawn
-# among the rows with a weight of its squared distance to the nearest centre already
-# chosen. A row that is already a centre weighs zero, so the draw never returns it a
-# second time, and rows far from everything chosen so far come up often. The fallback
-# further down is the one exception, and it is not a draw
+# k-means++ : the first centre is a row taken at random, then each new centre is drawn among
+# the rows with a weight of its squared distance to the nearest centre already chosen. A row
+# already a centre weighs zero, so the draw never returns it twice, and rows far from everything chosen come up often. The fallback further down is the one exception, and it is not a draw
 func _initial_centroids(rows) -> Array:
 	var centres = [rows[rng.randi() % rows.size()].duplicate()]
 	while centres.size() < k:
@@ -93,9 +71,7 @@ func _initial_centroids(rows) -> Array:
 			var weight: float = _nearest(row, centres)[1]
 			weights.push_back(weight)
 			total += weight
-		# every row sits exactly on a centre already, which happens when the data
-		# holds fewer distinct rows than k. There is nothing left to spread out, so
-		# the remaining centres are taken in order rather than drawn from nothing
+			# every row sits exactly on a centre already, which happens when the data holds fewer distinct rows than k: nothing left to spread out, so the remaining centres are taken in order rather than drawn from nothing
 		if total == 0.0:
 			for row in rows:
 				if centres.size() >= k:
@@ -104,8 +80,7 @@ func _initial_centroids(rows) -> Array:
 			break
 		var target: float = rng.randf() * total
 		var running: float = 0.0
-		# the last row is the fallback: floating point can leave the running sum a
-		# hair under the target on the very last step
+		# the last row is the fallback: floating point can leave the running sum a hair under the target on the very last step
 		var chosen = rows.size() - 1
 		for i in rows.size():
 			running += weights[i]
@@ -115,8 +90,7 @@ func _initial_centroids(rows) -> Array:
 		centres.push_back(rows[chosen].duplicate())
 	return centres
 
-# one run of Lloyd: put every row with its nearest centre, move every centre to the
-# middle of what it holds, and stop when nobody changed group
+# one run of Lloyd: put every row with its nearest centre, move every centre to the middle of what it holds, and stop when nobody changed group
 func _one_run(rows) -> Array:
 	var centres = _initial_centroids(rows)
 	var labels: Array = []
@@ -129,7 +103,6 @@ func _one_run(rows) -> Array:
 			if nearest != labels[i]:
 				labels[i] = nearest
 				moved = true
-		# nobody changed group, so no centre would move either
 		if not moved:
 			break
 		for c in centres.size():
@@ -140,15 +113,13 @@ func _one_run(rows) -> Array:
 					for u in n:
 						totals[u] += rows[i][u]
 					count += 1
-			# an empty group has no middle to move to: its centre stays where it is,
-			# the gentlest of the usual answers, and it never invents a row
+			# an empty group has no middle to move to: its centre stays where it is, the gentlest of the usual answers, and it never invents a row
 			if count == 0:
 				continue
 			for u in n:
 				centres[c][u] = totals[u] / float(count)
 	return centres
 
-# a row at a time into a contiguous float array, and back again
 func _packed_rows(rows) -> Array:
 	var packed: Array = []
 	for row in rows:
@@ -168,9 +139,7 @@ func _total_inertia(rows, centres) -> float:
 	return total
 
 func fit_begin(newX) -> bool:
-	# The rows are weighed before a single field is written: a fit that took them as
-	# they came would leave a working model holding a nan, or half rewritten by a
-	# raise in the middle. Answers false when it refuses, true when it fitted
+	# the rows are weighed before a single field is written: a fit that took them as they came would leave a working model holding a nan, or half rewritten by a raise in the middle
 	if not _check_matrix(newX, "DTDAKMeans"):
 		return false
 	if k <= 0:
@@ -184,8 +153,7 @@ func fit_begin(newX) -> bool:
 		return false
 	m = newX.size()
 	n = newX[0].size()
-	# the slice is one run from one set of starts. Built aside, so a training that
-	# never reaches the end leaves the standing model exactly as it was
+	# the slice is one run from one set of starts, built aside, so a training that never reaches the end leaves the standing model exactly as it was
 	var fitted_scaler := DTDAScaler.new()
 	_fit_work = {
 		"rows": _packed_rows(fitted_scaler.fit_transform(newX)),
@@ -220,7 +188,6 @@ func fit_step() -> float:
 	_fit_work = null
 	return 1.0
 
-# training in one go: begin, then step until there is nothing left
 func fit(newX) -> bool:
 	if not fit_begin(newX):
 		return false
@@ -238,16 +205,13 @@ func fit_predict(newX) -> Array:
 	fit(newX)
 	return predict(newX)
 
-# the inertia of any set of rows against the centres already learned. Lower is
-# tighter, and it only ever compares groupings of the same rows: it falls as k rises
-# whatever the grouping is worth, so it cannot be read as a score on its own
+# the inertia of any set of rows against the centres already learned. Lower is tighter, and it only ever compares groupings of the same rows: it falls as k rises whatever the grouping is worth, so it cannot be read as a score on its own
 func inertia_of(newX) -> float:
 	if not _check_fitted("DTDAKMeans", centroids, "inertia_of()"):
 		return 0.0
 	return _total_inertia(scaler.transform(newX), centroids)
 
-# the centres in the unit of the training data, rather than the scaled space the
-# model works in
+# the centres in the unit of the training data, rather than the scaled space the model works in
 func get_centroids() -> Array:
 	if not _check_fitted("DTDAKMeans", centroids, "get_centroids()"):
 		return []
@@ -275,10 +239,7 @@ func from_dict(data) -> bool:
 	if version != FORMAT_VERSION:
 		push_error("DTDAKMeans: this file is written in format %d, this model reads format %d" % [version, FORMAT_VERSION])
 		return false
-	# Everything is read aside first and only takes the place of the standing model
-	# once the whole file is known to be readable, and what is read is what a
-	# prediction computes with: every centre, and the scaler that brings a row into
-	# the space those centres live in
+	# everything is read aside and only takes the place of the standing model once the whole file is known to be readable: every centre, and the scaler that brings a row into the space those centres live in
 	var saved_centroids = data.get("centroids")
 	if typeof(saved_centroids) != TYPE_ARRAY or saved_centroids.size() == 0:
 		push_error("DTDAKMeans: the saved model has no centres")
@@ -295,8 +256,7 @@ func from_dict(data) -> bool:
 	var saved_scaler = DTDAScaler.new()
 	if not saved_scaler.from_dict(data.get("scaler", {})):
 		return false
-	# predict() scales a row and then measures it against the centres, so a scaler
-	# of one width and centres of another would read past the end of one of them
+	# predict() scales a row and then measures it against the centres, so a scaler of one width and centres of another would read past the end of one of them
 	if saved_scaler.offsets.size() != saved_centroids[0].size():
 		push_error("DTDAKMeans: the saved scaler holds %d columns and the centres %d" % [saved_scaler.offsets.size(), saved_centroids[0].size()])
 		return false
@@ -310,11 +270,7 @@ func from_dict(data) -> bool:
 	return true
 
 
-# === The older names === #
-# Every method above used to carry a leading underscore, which in Godot marks a
-# method as virtual or private: the engine calls _ready() and _process(), you do not.
-# The names below are the ones that shipped, kept working so nothing that already
-# calls them breaks. They only forward. Prefer the ones without the underscore.
+# the older underscored spellings, kept working for what already calls them; they only forward
 
 func _set_seed(value):
 	set_seed(value)
@@ -337,6 +293,3 @@ func _inertia_of(newX):
 func _get_centroids():
 	return get_centroids()
 
-
-
-# === End K-Means === #

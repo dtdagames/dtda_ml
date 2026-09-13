@@ -2,16 +2,11 @@ extends DTDATools
 
 class_name DTDATree
 
-# === Decision tree (CART) === #
-# CLASSIFIER splits on the Gini impurity and a leaf answers the majority label
-# REGRESSOR splits on the variance and a leaf answers the mean
+# CLASSIFIER splits on the Gini impurity and a leaf answers the majority label, REGRESSOR splits on the variance and a leaf answers the mean
 enum { CLASSIFIER, REGRESSOR }
 
-# max_features is what DTDAForest needs from a tree: how many features a single split
-# may look at, drawn again at every node. 0, the default, means all of them, in order,
-# and draws nothing at all, so a tree built on its own behaves exactly as it always did.
-# A forest whose trees each looked at every feature would grow the same tree over and
-# over, and averaging identical trees gains nothing.
+# max_features is what DTDAForest needs from a tree: how many features a single split may look at, drawn again at every node.
+# 0, the default, means all of them in order and draws nothing, so a lone tree behaves as it always did; a forest whose trees each looked at every feature would grow the same tree over and over, and averaging identical trees gains nothing
 
 var m: int = 0
 var n: int = 0
@@ -19,12 +14,10 @@ var mode: int
 var max_depth: int
 var min_samples_split: int
 var max_features: int
-# its own generator, so a forest can hand each of its trees a reproducible stream
 var rng: RandomNumberGenerator
 var X
 var Y
-# the tree itself, nested dictionaries of nodes
-# a branch holds feature/threshold/left/right, a leaf holds a single value
+# the tree itself, nested dictionaries: a branch holds feature/threshold/left/right, a leaf a single value
 var root
 
 func _init(tree_max_depth: int = 5, tree_min_samples_split: int = 2, tree_mode: int = CLASSIFIER, tree_max_features: int = 0) -> void:
@@ -34,8 +27,7 @@ func _init(tree_max_depth: int = 5, tree_min_samples_split: int = 2, tree_mode: 
 	max_features = tree_max_features
 	rng = RandomNumberGenerator.new()
 
-# fix the feature draws, for a reproducible tree. Pointless while max_features is 0,
-# where nothing is drawn
+# fix the feature draws for a reproducible tree; pointless while max_features is 0, where nothing is drawn
 func set_seed(value: int) -> void:
 	rng.seed = value
 
@@ -50,7 +42,6 @@ func _gini(rows) -> float:
 		impurity -= p * p
 	return impurity
 
-# variance of the labels held by the given rows
 func _variance(rows) -> float:
 	var values = []
 	for i in rows:
@@ -68,7 +59,6 @@ func _impurity(rows) -> float:
 		return _variance(rows)
 	return _gini(rows)
 
-# every midpoint between two consecutive distinct values of a feature
 func _candidate_thresholds(rows, feature: int) -> Array:
 	var values = []
 	for i in rows:
@@ -80,7 +70,6 @@ func _candidate_thresholds(rows, feature: int) -> Array:
 			thresholds.push_back((values[i] + values[i-1]) / 2.0)
 	return thresholds
 
-# the features a single split may look at, all of them in order by default
 func _features_for_split() -> Array:
 	var every: Array = []
 	for feature in n:
@@ -94,15 +83,11 @@ func _features_for_split() -> Array:
 		drawn.push_back(every.pop_at(rng.randi() % every.size()))
 	return drawn
 
-# the split lowering the impurity the most, or an empty dictionary when none does
-# when max_features hides every usable feature from a node, that node finds nothing
-# and becomes a leaf. A lone tree keeps growing, only a forest can end up there
+# the split lowering the impurity the most, or an empty dictionary when none does: when max_features hides every usable feature from a node, that node becomes a leaf, which only happens in a forest
 func _best_split(rows) -> Dictionary:
 	var parent = _impurity(rows)
 	var best = {}
-	# a split of gain 0 is still worth taking: on a XOR, no single feature helps at the
-	# root, yet each half becomes separable one level down. Only the absence of any
-	# usable threshold leaves this empty.
+	# a split of gain 0 is still worth taking: on a XOR no single feature helps at the root, yet each half becomes separable one level down. Only the absence of any usable threshold leaves this empty
 	var best_gain: float = -1.0
 	for feature in _features_for_split():
 		for threshold in _candidate_thresholds(rows, feature):
@@ -113,8 +98,7 @@ func _best_split(rows) -> Dictionary:
 					left.push_back(i)
 				else:
 					right.push_back(i)
-			# a threshold taken between two distinct values always fills both sides,
-			# the guard only protects against a malformed row
+			# a threshold taken between two distinct values always fills both sides, the guard only protects against a malformed row
 			if left.size() == 0 or right.size() == 0:
 				continue
 			var weighted = (left.size() * _impurity(left) + right.size() * _impurity(right)) / float(rows.size())
@@ -124,7 +108,6 @@ func _best_split(rows) -> Dictionary:
 				best = {"feature": feature, "threshold": threshold, "left": left, "right": right}
 	return best
 
-# what a leaf answers: the mean in regression, the majority label otherwise
 func _leaf_value(rows):
 	var values = []
 	for i in rows:
@@ -143,7 +126,6 @@ func _leaf_value(rows):
 	return leaf
 
 func _build(rows, depth):
-	# a pure node, or one too small or too deep to be split again
 	if depth >= max_depth or rows.size() < min_samples_split or _impurity(rows) == 0.0:
 		return {"leaf": _leaf_value(rows)}
 	var split = _best_split(rows)
@@ -158,15 +140,12 @@ func _build(rows, depth):
 	}
 
 func fit(newX, newY) -> bool:
-	# The rows are weighed before a single field is written: a fit that took them as
-	# they came would leave a working model holding a nan, or half rewritten by a
-	# raise in the middle. Answers false when it refuses, true when it fitted
+	# the rows are weighed before a single field is written: a fit that took them as they came would leave a working model holding a nan, or half rewritten by a raise in the middle
 	if not _check_matrix(newX, "DTDATree"):
 		return false
 	if not _check_labels(newX, newY, "DTDATree"):
 		return false
-	# a leaf answers the mean when regressing, so the labels are numbers there. When
-	# classifying it only counts them, and a label can be whatever names a class
+	# a leaf answers the mean when regressing, so the labels are numbers there; when classifying it only counts them, and a label can be whatever names a class
 	if mode == REGRESSOR and not _check_number_array(newY, "DTDATree", "labels"):
 		return false
 	m = newX.size()
@@ -180,7 +159,6 @@ func fit(newX, newY) -> bool:
 	root = _build(rows, 0)
 	return true
 
-# walk down the tree, a value lower than or equal to the threshold goes left
 func _predict_row(row):
 	var node = root
 	while not node.has("leaf"):
@@ -215,10 +193,7 @@ func to_dict() -> Dictionary:
 func from_dict(data) -> bool:
 	if not _check_model_name(data, "DTDATree"):
 		return false
-	# A model file lives in user://, where it can be edited by hand, and DTDAForest
-	# hands whole subtrees straight to this function. Nothing is written into the tree
-	# until the file has been read: a refused file leaves a working tree as it was,
-	# growth limits included
+	# a model file lives in user://, where it can be edited by hand, and DTDAForest hands whole subtrees straight to this function. Nothing is written into the tree until the file has been read: a refused file leaves a working tree as it was, growth limits included
 	var saved_root = data.get("root")
 	# absent and malformed answer the same way: a null is not a node either
 	if typeof(saved_root) != TYPE_DICTIONARY:
@@ -233,11 +208,7 @@ func from_dict(data) -> bool:
 	return true
 
 
-# === The older names === #
-# Every method above used to carry a leading underscore, which in Godot marks a
-# method as virtual or private: the engine calls _ready() and _process(), you do not.
-# The names below are the ones that shipped, kept working so nothing that already
-# calls them breaks. They only forward. Prefer the ones without the underscore.
+# the older underscored spellings, kept working for what already calls them; they only forward
 
 func _set_seed(value):
 	set_seed(value)
@@ -248,6 +219,3 @@ func _fit(newX, newY):
 func _predict(newX):
 	return predict(newX)
 
-
-
-# === End Decision tree === #

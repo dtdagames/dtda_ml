@@ -2,13 +2,7 @@ extends RefCounted
 
 class_name DTDADemoMaze
 
-# The world the demo agent learns in, kept apart from anything that draws it so the
-# learning can be verified headless. demo/verify_maze.gd does exactly that.
-#
-# An open arena rather than a corridor maze: the agent can move anywhere, and what
-# it has to learn is where NOT to go. That is what makes the before/after visible —
-# an untrained agent walks into the lava within a few steps, a trained one threads
-# between the patches.
+# The world the demo agent learns in, kept apart from anything that draws it so the learning can be verified headless by demo/verify_maze.gd. An open arena rather than a corridor maze: the agent can move anywhere and what it has to learn is where NOT to go, which is what makes the before/after visible.
 
 const GRID = [
 	"...##......G",
@@ -23,15 +17,9 @@ const GRID = [
 
 const ACTIONS = ["up", "down", "left", "right"]
 
-# One step of walking costs a little, so a wandering agent is worse than a direct one
-# even when both survive. Without it every surviving path scores the same and the
-# agent has no reason to shorten anything.
+# one step of walking costs a little, so a wandering agent is worse than a direct one even when both survive; without it every surviving path scores the same and the agent has no reason to shorten anything
 const STEP_REWARD = -1.0
-# Lava hurts and blocks, it does not kill. Ending the episode on contact was the first
-# design and it does not learn: the agent dies within about ten steps while the goal is
-# eighteen away, so it never once collects the reward it is supposed to be chasing and
-# has nothing to propagate. Verified rather than reasoned - demo/verify_maze.gd caught
-# it, with a trained agent no better than an untrained one.
+# lava hurts and blocks, it does not kill: ending the episode on contact does not learn, the agent dying within about ten steps while the goal is eighteen away, never collecting the reward it is chasing and having nothing to propagate. Verified rather than reasoned, demo/verify_maze.gd caught it with a trained agent no better than an untrained one
 const LAVA_REWARD = -25.0
 const GOAL_REWARD = 100.0
 const MAX_STEPS = 200
@@ -56,9 +44,7 @@ func is_lava(cell: Vector2i) -> bool:
 func is_goal(cell: Vector2i) -> bool:
 	return cell == goal_cell
 
-# The state handed to the agent is an integer, never a float. The q table keys on
-# str(), and str(2.0) prints "2" up to Godot 4.3 and "2.0" from 4.4 on, so a float
-# state would give a table that does not survive an engine upgrade.
+# the state handed to the agent is an integer, never a float: the q table keys on str(), and str(2.0) prints "2" up to Godot 4.3 and "2.0" from 4.4, so a float state would give a table that does not survive an engine upgrade
 func state_of(cell: Vector2i) -> int:
 	return cell.y * width + cell.x
 
@@ -69,25 +55,21 @@ func moved(cell: Vector2i, action: String) -> Vector2i:
 		"down": next.y += 1
 		"left": next.x -= 1
 		"right": next.x += 1
-	# walking into the edge leaves it where it is, it does not end the episode
 	if next.x < 0 or next.x >= width or next.y < 0 or next.y >= height:
 		return cell
 	return next
 
-# Answers {cell, reward, done, burnt} rather than mutating anything, so the same call
-# is usable by the training loop and by the replay that draws it.
+# Answers {cell, reward, done, burnt} rather than mutating anything, so the same call is usable by the training loop and by the replay that draws it.
 func step(cell: Vector2i, action: String) -> Dictionary:
 	var next := moved(cell, action)
-	# Lava blocks and hurts: the agent stays on the cell it came from. Nothing ends the
-	# episode but reaching the goal, or running out of steps.
+	# lava blocks and hurts, the agent stays on the cell it came from; nothing ends the episode but reaching the goal, or running out of steps
 	if is_lava(next):
 		return {"cell": cell, "reward": LAVA_REWARD, "done": false, "burnt": true}
 	if is_goal(next):
 		return {"cell": next, "reward": GOAL_REWARD, "done": true, "burnt": false}
 	return {"cell": next, "reward": STEP_REWARD, "done": false, "burnt": false}
 
-# Plays one episode and returns the path walked, so the demo can replay a run rather
-# than re-simulate it. greedy = true takes the learned policy with no exploration.
+# Plays one episode and returns the path walked, so the demo can replay a run rather than re-simulate it.
 func play(agent: DTDAQLearning, learning: bool) -> Dictionary:
 	var cell := start_cell
 	var path: Array[Vector2i] = [cell]
@@ -107,8 +89,7 @@ func play(agent: DTDAQLearning, learning: bool) -> Dictionary:
 			break
 	return {"path": path, "reward": total, "reached": reached}
 
-# The whole training, returned rather than printed: the first episode, the last one,
-# and the length of every episode in between for the curve the demo draws.
+# The whole training, returned rather than printed: the first episode, the last one, and the length of every episode in between for the curve the demo draws.
 func train(episodes: int, seed_value: int) -> Dictionary:
 	var agent := DTDAQLearning.new(0.2, 0.95, 1.0, 0.99, 0.02)
 	agent.set_seed(seed_value)
@@ -119,10 +100,7 @@ func train(episodes: int, seed_value: int) -> Dictionary:
 		if e == 0:
 			first = run
 		lengths.append(run["path"].size() - 1)
-		# epsilon does not decay on its own: DTDAQLearning leaves it to the caller,
-		# because only the caller knows where an episode ends. Forgetting this call
-		# leaves the agent exploring at full rate forever - it still learns a good
-		# table, but it never uses it, and every episode looks as random as the first.
+		# epsilon does not decay on its own, DTDAQLearning leaves it to the caller because only the caller knows where an episode ends: forgetting this call leaves the agent exploring at full rate forever, still learning a good table but never using it
 		agent.decay_exploration()
 	return {
 		"agent": agent,

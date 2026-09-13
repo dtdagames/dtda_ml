@@ -1,9 +1,4 @@
-# Training a slice at a time.
-#
-# fit() runs to the end before it returns, which on a forest is seconds: a frozen
-# frame. The same training can be taken a slice per frame instead. fit() is that loop
-# and nothing else, so everything the other suites assert about fit() is already
-# asserting about the stepping underneath; what is left to pin is here.
+# Training a slice at a time. fit() runs to the end before it returns, which on a forest is seconds: a frozen frame. The same training can be taken a slice per frame instead. fit() is that loop and nothing else, so everything the other suites assert about fit() is already asserting about the stepping underneath; what is left to pin is here.
 
 # how many assertions this suite runs, checked by the runner
 const PLAN = 29
@@ -26,8 +21,7 @@ func _stepped(model, rows, labels):
 
 func _run(t):
 	t.section("Stepped training, the same model either way")
-	# every one of these takes its slices in a different unit: a round of the descent,
-	# a pass over the rows, a run from fresh starts, a whole tree
+	# every one of these takes its slices in a different unit: a round of the descent, a pass over the rows, a run from fresh starts, a whole tree
 	for pair in [["LinReg", DTDALinReg.new(0.01, 30), DTDALinReg.new(0.01, 30)],
 			["LogReg", DTDALogReg.new(0.01, 30), DTDALogReg.new(0.01, 30)],
 			["SVM", DTDASVM.new(0.01, 0.01, 30), DTDASVM.new(0.01, 0.01, 30)]]:
@@ -69,9 +63,7 @@ func _run(t):
 	t.check_equal("and nothing is under way any more", walker.is_fitting(), false)
 
 	t.section("Stepped training, a training that never finishes (errors below are expected)")
-	# The invariant that governs a refused fit and a refused file, applied to time:
-	# either the model it was going to replace, whole, or the new one, whole, and
-	# never a half of each. Three ways of not finishing, so it does not rest on one
+	# the invariant that governs a refused fit and a refused file, applied to time: either the model it was going to replace, whole, or the new one, whole, and never a half of each. Three ways of not finishing, so it does not rest on one
 	var standing := DTDALinReg.new(0.01, 40)
 	standing.fit(X, Y)
 	var before := standing.predict(PROBE)

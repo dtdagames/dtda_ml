@@ -2,38 +2,15 @@ extends DTDATools
 
 class_name DTDAQLearning
 
-# === Q-Learning === #
-# A tabular agent that learns while playing: there is no training set, it improves from
-# the transitions you feed it. The table holds the expected discounted return of every
-# (state, action) pair met so far, and the policy is "take the best action of this state".
-#
-# States and actions are free, they are not assumed to be contiguous integers. Both are
-# keyed by str(), which is also what a JSON object needs, so a table written to disk comes
-# back usable with the very same native values. What that costs:
-#  - two values with the same str() are the same key: the integer 1 and the string "1"
-#    share a row, and inside one state the integer 2 and the string "2" share a cell.
-#    Which pairs collide follows the number formatting of the engine, and that does
-#    move: str(2.0) prints "2" up to Godot 4.3 and "2.0" from 4.4 on, so a whole float
-#    and an integer are one key on 4.3 and two on 4.4. Use one spelling per action
-#  - across two states colliding actions keep their own q values, but not their type:
-#    it is remembered once for the whole agent, so the last one learned decides what
-#    predict() hands back everywhere, in every state
-#  - a float key goes through str(), which may not carry every digit of a double:
-#    depending on the engine, 1.0/3.0 comes back exactly or a hair off. Quantize a
-#    continuous state, a position for instance, rather than rely on either
-#  - a file holding float keys is tied to the engine it was written on, for the same
-#    reason: an agent saved on 4.3 with the state 2.0 wrote the key "2", which 4.4
-#    spells "2.0" and would no longer find. Integer and string keys are unaffected
-# An action is answered back with its own type for int, float, bool, String and
-# StringName, anything else comes back as its string key and warns when saved.
+# Tabular Q-learning: no training set, the agent improves from the transitions it is fed.
+# States and actions are free values, keyed by str() so a table survives JSON unchanged: two
+# values sharing a str() share a cell (integer 1 and string "1"), and str() of a float moves
+# between engines (2.0 prints "2" up to 4.3, "2.0" from 4.4), tying a file with float keys to
+# the engine that wrote it, so quantize a continuous state. An action comes back with its own type when it can, otherwise as its string key, and that one warns when saved.
 
-# version 1 wrote the type of an action as the raw value of the engine enum, which
-# version 2 replaced by the stable labels below. The two cannot be told apart from
-# the content alone, so a file that does not announce the current version is refused
+# version 1 wrote the type of an action as the raw engine enum value, version 2 the stable labels below, and content alone cannot tell them apart: an unversioned file is refused
 const FORMAT_VERSION = 2
 
-# a stable label per type, rather than the raw value of the engine enum, so a file
-# written today still reads the same way on a later version of Godot
 const ACTION_TYPES = {
 	TYPE_INT: "int",
 	TYPE_FLOAT: "float",
@@ -44,27 +21,20 @@ const ACTION_TYPES = {
 
 var learning_rate: float
 var discount_factor: float
-# epsilon: the share of the moves taken at random rather than greedily
 var exploration_rate: float
 var exploration_decay: float
 var min_exploration_rate: float
-# where the exploration started, so reset() puts the agent back as it was
 var start_exploration_rate: float
-# {state key: {action key: q value}}, null until the first learn()
 var q_table
-# {action key: the action itself}, so the agent answers with what you passed it
-# it is global to the agent, not kept per state
+# {action key: the action itself}, global to the agent rather than kept per state
 var actions_seen
-# its own generator, so a game can replay an identical run with set_seed()
 var rng: RandomNumberGenerator
-# the seed given to set_seed(), replayed by reset(), null when none was asked for
 var start_seed
 
 func _init(q_learning_rate: float = 0.1, q_discount_factor: float = 0.9, q_exploration_rate: float = 1.0, q_exploration_decay: float = 0.99, q_min_exploration_rate: float = 0.01) -> void:
 	learning_rate = q_learning_rate
 	discount_factor = q_discount_factor
-	# epsilon and its floor are probabilities, they are brought into [0, 1] here
-	# rather than left to contradict the interval the rest of the class promises
+# epsilon and its floor are probabilities, clamped here rather than left to contradict it
 	exploration_rate = clamp(q_exploration_rate, 0.0, 1.0)
 	start_exploration_rate = exploration_rate
 	exploration_decay = q_exploration_decay
@@ -73,24 +43,19 @@ func _init(q_learning_rate: float = 0.1, q_discount_factor: float = 0.9, q_explo
 	rng = RandomNumberGenerator.new()
 	start_seed = null
 
-# a JSON object only has string keys, so the table is keyed by str() from the start:
-# what is written is exactly what is read back
 func _key(value) -> String:
 	return str(value)
 
-# fix the random draws, for a reproducible training run
-# reset() puts the generator back on that same seed
+# fix the random draws for a reproducible run; reset() replays this same seed
 func set_seed(value: int) -> void:
 	start_seed = value
 	rng.seed = value
 
-# an omitted or null list of actions means "everything already known here"
 func _as_list(valid_actions) -> Array:
 	if valid_actions == null:
 		return []
 	return valid_actions
 
-# expected return of an action in a state, 0.0 when it was never met
 func get_q(state, action) -> float:
 	if q_table == null:
 		return 0.0
@@ -99,7 +64,6 @@ func get_q(state, action) -> float:
 		return 0.0
 	return row.get(_key(action), 0.0)
 
-# the actions already met in a state, in the order they were first learned
 func _known_actions(state) -> Array:
 	var known: Array = []
 	if q_table == null:
@@ -111,7 +75,6 @@ func _known_actions(state) -> Array:
 		known.push_back(actions_seen.get(action_key, action_key))
 	return known
 
-# best q value reachable from a state, 0.0 when nothing is known about it
 func _max_q(state, valid_actions = []) -> float:
 	var candidates = _as_list(valid_actions)
 	if candidates.is_empty():
@@ -125,9 +88,7 @@ func _max_q(state, valid_actions = []) -> float:
 			best = value
 	return best
 
-# the action with the highest q value among the given ones
-# the comparison is strict, so a tie keeps the first action of the list and the
-# answer of an agent that knows nothing yet stays reproducible
+# strict comparison, so a tie keeps the first action and an agent that knows nothing yet stays reproducible
 func _best_action(state, valid_actions):
 	var best = null
 	var best_value: float = -INF
@@ -138,30 +99,19 @@ func _best_action(state, valid_actions):
 			best_value = value
 	return best
 
-# epsilon-greedy: exploration_rate of the time a random valid action, the rest of the
-# time the best one known so far. This is the one that may answer on a state it never
-# met, which is the whole point of the first episode: every q value is 0, a tie, so the
-# first action of the list comes out
+# epsilon-greedy; on a state never met every q is 0, a tie, so the first action of the list comes out
 func choose_action(state, valid_actions):
 	if valid_actions == null or valid_actions.size() == 0:
 		push_error("DTDAQLearning: choose_action() called without any valid action")
 		return null
-	# randf() lives in [0, 1), so an exploration_rate of 0.0 never explores
-	# and one of 1.0 always does
+# randf() lives in [0, 1), so an exploration_rate of 0.0 never explores and 1.0 always does
 	if rng.randf() < exploration_rate:
 		return valid_actions[rng.randi() % valid_actions.size()]
 	return _best_action(state, valid_actions)
 
-# one transition, the Bellman update:
-#   Q(s, a) += lr * (reward + gamma * max Q(s', a') - Q(s, a))
-# a terminal transition has no future, its target is the reward alone
-# next_actions restricts what the agent may do next, leave it out to look at
-# everything already known about next_state
+# Bellman: Q(s, a) += lr * (reward + gamma * max Q(s', a') - Q(s, a)); a terminal transition has no future, its target is the reward alone
 func learn(state, action, reward, next_state, next_actions = [], done = false):
-	# the reward lands straight in the table and is compared against every other q
-	# value from then on. A nan there answers false to every comparison, so predict()
-	# stops being able to name a best action for that state at all. Answers null when
-	# it refuses, and the cell keeps the value it had
+# a nan reward answers false to every comparison, leaving predict() unable to name a best action here: refuse, answer null, keep the cell
 	if not _check_number(reward, "DTDAQLearning", "reward"):
 		return null
 	if q_table == null:
@@ -178,14 +128,10 @@ func learn(state, action, reward, next_state, next_actions = [], done = false):
 	q_table[state_key][action_key] = current + learning_rate * (target - current)
 	return q_table[state_key][action_key]
 
-# the learned policy, without any exploration: the best action known for this state
-# valid_actions restricts the choice, leave it out to pick among everything learned there
 func predict(state, valid_actions = []):
 	if not _check_fitted("DTDAQLearning", q_table):
 		return null
-	# a state never met has nothing to answer, whatever the actions offered: they would
-	# all be worth 0 and the first of the list would come out dressed as a learned
-	# policy. Use choose_action() when you need a move no matter what
+# a state never met would hand back the first action offered dressed as a learned policy; choose_action() is the one that answers regardless
 	if not q_table.has(_key(state)):
 		push_error("DTDAQLearning: predict() knows nothing about the state '%s'" % _key(state))
 		return null
@@ -198,15 +144,12 @@ func predict(state, valid_actions = []):
 		return null
 	return _best_action(state, candidates)
 
-# call at the end of an episode: the agent explores a little less from now on
-# epsilon is a probability, it stays in [min_exploration_rate, 1] whatever the decay
+# epsilon stays in [min_exploration_rate, 1] whatever the decay
 func decay_exploration() -> float:
 	exploration_rate = max(min_exploration_rate, exploration_rate * exploration_decay)
 	exploration_rate = clamp(exploration_rate, 0.0, 1.0)
 	return exploration_rate
 
-# forget everything learned and put the agent back where it started: the exploration
-# rate it was built with, and the seed it was given
 func reset() -> void:
 	q_table = null
 	actions_seen = {}
@@ -214,8 +157,7 @@ func reset() -> void:
 	if start_seed != null:
 		rng.seed = start_seed
 
-# an action goes out as its key plus the label of its type, so the integer 2 does not
-# come back as the string "2" or as the float 2.0
+# an action goes out with the label of its type, so the integer 2 does not come back as "2" or 2.0
 func _actions_to_dict() -> Dictionary:
 	var types = {}
 	for action_key in actions_seen:
@@ -235,7 +177,6 @@ func _action_from_key(action_key, label):
 			return action_key == "true"
 		"string_name":
 			return StringName(action_key)
-		# a string comes back as its own key, and so does anything we cannot rebuild
 		_:
 			return action_key
 
@@ -271,8 +212,7 @@ func from_dict(data) -> bool:
 	if typeof(table) != TYPE_DICTIONARY:
 		push_error("DTDAQLearning: the saved q table is not a table")
 		return false
-	# a model file lives in user://, where a player can edit it: the table is rebuilt
-	# row by row and only replaces the current one once it is known to be sound
+# a model file lives in user://, where a player can edit it: rebuild row by row and only replace the table once it is sound
 	var rebuilt = {}
 	for state_key in table:
 		var row = table[state_key]
@@ -305,11 +245,7 @@ func from_dict(data) -> bool:
 	return true
 
 
-# === The older names === #
-# Every method above used to carry a leading underscore, which in Godot marks a
-# method as virtual or private: the engine calls _ready() and _process(), you do not.
-# The names below are the ones that shipped, kept working so nothing that already
-# calls them breaks. They only forward. Prefer the ones without the underscore.
+# the older underscored spellings, kept working for what already calls them; they only forward
 
 func _set_seed(value):
 	set_seed(value)
@@ -332,6 +268,3 @@ func _decay_exploration():
 func _reset():
 	reset()
 
-
-
-# === End Q-Learning === #

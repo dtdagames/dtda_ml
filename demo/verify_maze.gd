@@ -1,20 +1,12 @@
 extends SceneTree
 
-# Headless check of the demo. Not part of the test suite: it proves the demo is worth
-# showing, not that the library is correct.
-#
-#   godot --headless --script res://demo/verify_maze.gd
-#
-# It answers the only question the demo makes a claim about: does the agent actually
-# get better, and is the arena solvable at all.
+# Headless check of the demo, run with godot --headless --script res://demo/verify_maze.gd. Not part of the test suite: it answers the only question the demo makes a claim about, does the agent actually get better and is the arena solvable at all.
 
 func _initialize():
 	var world := DTDADemoMaze.new()
 	var failures := 0
 
-	# 1. the arena has a path at all. A demo whose goal is unreachable would still
-	# "learn" something and show an agent dying forever, which reads as a broken model
-	# rather than a broken level.
+	# 1. the arena has a path at all. A demo whose goal is unreachable would still "learn" something and show an agent dying forever, which reads as a broken model rather than a broken level
 	var shortest := _bfs(world)
 	if shortest < 0:
 		print("FAIL  the goal is unreachable, the arena is not solvable")
@@ -36,16 +28,13 @@ func _initialize():
 		print("FAIL  the trained agent does not reach the goal")
 		failures += 1
 
-	# 3. it is not merely lucky: the learned path is at most two steps off the best
-	# possible one. A path that merely survives would not look like learning.
+	# 3. it is not merely lucky: the learned path is at most two steps off the best possible one, a path that merely survives would not look like learning
 	if shortest >= 0 and learned["path"].size() - 1 > shortest + 2:
 		print("FAIL  the learned path is %d steps against %d possible" % [
 			learned["path"].size() - 1, shortest])
 		failures += 1
 
-	# 4. the contrast is visible. The whole point of the demo is the before/after, so
-	# a first episode that already looks competent makes it pointless. Luck is allowed
-	# to carry an untrained agent to the goal; taking a comparable route is not.
+	# 4. the contrast is visible, the whole point of the demo being the before/after: luck is allowed to carry an untrained agent to the goal, taking a comparable route is not
 	var first_steps: int = first["path"].size() - 1
 	var learned_steps: int = learned["path"].size() - 1
 	if first_steps < learned_steps * 3:
@@ -53,11 +42,8 @@ func _initialize():
 			first_steps, learned_steps])
 		failures += 1
 
-	# 5. the curve goes down. Averaged over blocks, because single episodes are noisy
-	# while epsilon is still high.
+	# 5. the curve goes down, averaged over blocks because single episodes are noisy while epsilon is still high; the block is capped by what was actually run, slice(size - 50) walking backwards from the end would take the whole array on a shorter training
 	var lengths: Array = result["lengths"]
-	# the block is capped by what was actually run: slice(size - 50) walks backwards
-	# from the end and would take the whole array on a shorter training
 	var block: int = min(50, int(lengths.size() / 2.0))
 	var early := _mean(lengths.slice(0, block))
 	var late := _mean(lengths.slice(lengths.size() - block))
@@ -79,8 +65,7 @@ func _mean(values: Array) -> float:
 		total += float(v)
 	return total / float(values.size())
 
-# Breadth-first search over the walkable cells, to know the best possible path
-# independently of anything the agent does.
+# Breadth-first search over the walkable cells, to know the best possible path independently of anything the agent does.
 func _bfs(world: DTDADemoMaze) -> int:
 	var queue: Array[Vector2i] = [world.start_cell]
 	var seen := {world.start_cell: 0}

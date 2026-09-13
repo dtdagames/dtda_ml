@@ -1,9 +1,8 @@
 extends SceneTree
 
-# Headless check of the linear regression demo. Not part of the test suite: it proves
-# the demo is worth showing, not that the library is correct.
-#
+# Headless check of the linear regression demo, run with
 #   godot --headless --script res://demo/verify_turret.gd
+# Not part of the test suite: it proves the demo is worth showing, not that the library is correct.
 
 func _initialize():
 	var world := DTDADemoTurret.new()
@@ -21,8 +20,7 @@ func _initialize():
 		quit(1)
 		return
 
-	# 1. the fit explains the shots it saw. Reported for both, because the gap between
-	# them is what the demo is about.
+	# 1. the fit explains the shots it saw, reported for both because the gap between them is what the demo is about
 	var r2_plain := _r2(tools, world, sample, plain, false)
 	var r2_curved := _r2(tools, world, sample, curved, true)
 	print("R2  distance only        : %.4f" % r2_plain)
@@ -34,9 +32,7 @@ func _initialize():
 		print("FAIL  the square adds nothing, the demo has no point to make")
 		failures += 1
 
-	# 2. it hits, on targets it never trained on
-	# one set of targets, handed to all three: comparing means drawn from different
-	# samples would mix the luck of the draw into the difference being reported
+	# 2. it hits, on targets it never trained on: one set of targets handed to all three, comparing means drawn from different samples would mix the luck of the draw into the difference reported
 	var test_targets := world.targets(rng, 400)
 	var miss_plain: Dictionary = world.evaluate(plain, false, test_targets)
 	var miss_curved: Dictionary = world.evaluate(curved, true, test_targets)
@@ -54,14 +50,12 @@ func _initialize():
 	if miss_curved["mean"] >= miss_plain["mean"]:
 		print("FAIL  the extra feature does not improve the aim")
 		failures += 1
-	# an absolute floor as well as a comparison: "better than nothing" would still be
-	# true of a turret missing by ten metres, which is not something to put on a page
+	# an absolute floor as well as a comparison: "better than nothing" would still be true of a turret missing by ten metres, which is not something to put on a page
 	if miss_curved["mean"] > 0.02 * reach:
 		print("FAIL  even the better model misses by more than 2% of its reach")
 		failures += 1
 
-	# 3. the weights survive a round trip. This is the use case the README leads with -
-	# fit somewhere, ship the file, load it in the game - so the demo has to hold it.
+	# 3. the weights survive a round trip, the use case the README leads with: fit somewhere, ship the file, load it in the game
 	var path := "user://dtda_demo_turret.json"
 	if not curved.save(path):
 		print("FAIL  save() refused the fitted model")

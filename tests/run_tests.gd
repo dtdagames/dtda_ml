@@ -1,24 +1,8 @@
 extends SceneTree
 
-# Headless test runner.
-#   godot --headless --script res://tests/run_tests.gd
-# Exits with 0 when everything passes, 1 otherwise, which is what CI reads.
-#
-# Some tests exercise the guards of the addon on purpose, so the output contains
-# expected "DTDATools: ..." errors. Those ones are not failures.
-#
-# Everything else the engine prints is worth reading, because a GDScript runtime
-# error raised while an assertion was being evaluated used to swallow that
-# assertion whole: it counted neither as a pass nor as a failure, and the last
-# line stayed green while the suite quietly ran fewer checks than it used to.
-# Two things guard against that now and both must stay:
-#   - check_near() and check_near_array() refuse a value that is not a number
-#     instead of letting abs() raise, so a predict() regressed to null lands as
-#     a FAIL rather than disappearing
-#   - every suite declares a PLAN, the number of assertions it runs, and the
-#     runner fails when it records a different number
-# So: the FAIL lines and the final count are what matter, and they can now be
-# trusted to be complete.
+# Headless test runner: godot --headless --script res://tests/run_tests.gd. Exits 0 when everything passes, 1 otherwise, which is what CI reads.
+# Some tests exercise the guards of the addon on purpose, so the output contains expected "DTDATools: ..." errors; those are not failures.
+# Everything else the engine prints is worth reading: a GDScript runtime error raised while an assertion was being evaluated used to swallow that assertion whole, counting neither as a pass nor as a failure while the last line stayed green on a suite running fewer checks. Two guards stand against that and both must stay: check_near() and check_near_array() refuse a value that is not a number instead of letting abs() raise, so a predict() regressed to null lands as a FAIL rather than disappearing, and every suite declares a PLAN, the number of assertions it runs, which the runner compares to what it recorded.
 
 const TEST_SCRIPTS = [
 	"res://tests/test_runner.gd",
@@ -50,9 +34,7 @@ func _initialize():
 	print("%d passed, %d failed" % [passed, failed])
 	quit(1 if failed > 0 else 0)
 
-# a suite stopping halfway, on a script error for instance, records fewer
-# assertions than it announces. Without this the count would simply come out
-# smaller, which nobody reads as a failure
+# a suite stopping halfway, on a script error for instance, records fewer assertions than it announces; without this the count would simply come out smaller, which nobody reads as a failure
 func _check_plan(path, script, recorded):
 	var constants = script.get_script_constant_map()
 	if not constants.has("PLAN"):
@@ -81,12 +63,8 @@ func check(name, condition):
 	else:
 		_fail(name, "expected true")
 
-# deep comparison, so nested arrays and dictionaries do not depend on how a
-# given Godot version implements ==
-# some pairs of types raise on ==, "2" == 2 for one, which would print a script
-# error and answer null. Numbers are compared across int and float, everything
-# else has to match in type first, so this is safe on whatever a broken model
-# hands back
+# deep comparison, so nested arrays and dictionaries do not depend on how a given Godot version implements ==
+# some pairs of types raise on ==, "2" == 2 for one, which would print a script error and answer null. Numbers are compared across int and float, everything else has to match in type first, so this is safe on whatever a broken model hands back
 func _same(a, b):
 	if _is_number(a) and _is_number(b):
 		return a == b
@@ -114,14 +92,8 @@ func check_equal(name, got, expected):
 	else:
 		_fail(name, "got %s, expected %s" % [got, expected])
 
-# A nan carries a numeric type and is not a number anything can be measured against:
-# every comparison with it answers false, so a check written as "too far apart" reads
-# it as "close enough" and lets it through. It is what a 0/0 or an inf minus an inf
-# leaves behind, which eight models computing in floating point can produce, so it is
-# turned away here rather than in each of the callers: the blindness this replaces was
-# a guard added against null that nobody thought to widen.
-# _same() reads this too and is not moved by it, a nan already failing there: it is
-# equal to nothing, itself included
+# A nan carries a numeric type and is not a number anything can be measured against: every comparison with it answers false, so a check written as "too far apart" reads it as "close enough" and lets it through. It is what a 0/0 or an inf minus an inf leaves behind, which eight models computing in floating point can produce, so it is turned away here rather than in each of the callers.
+# _same() reads this too and is not moved by it, a nan already failing there: it is equal to nothing, itself included
 func _is_number(value):
 	if typeof(value) == TYPE_INT:
 		return true
@@ -129,23 +101,18 @@ func _is_number(value):
 		return false
 	return not is_nan(value)
 
-# "" when the two values are close enough, the reason of the failure otherwise.
-# the rule lives apart from check_near() so it can be tested without going
-# through the counters. The type check is the point: abs(null - 1.0) raises,
-# and a raise inside an assertion makes it vanish from the count
+# "" when the two values are close enough, the reason of the failure otherwise. The rule lives apart from check_near() so it can be tested without going through the counters, and the type check is the point: abs(null - 1.0) raises, and a raise inside an assertion makes it vanish from the count
 func _near_reason(got, expected, tolerance):
 	if not _is_number(got) or not _is_number(expected):
 		return "got %s, expected a number near %s" % [got, expected]
 	var apart = abs(got - expected)
-	# two infinities are not any distance apart, they leave a nan behind, and the
-	# comparison below would read that nan as close enough
+	# two infinities are not any distance apart, they leave a nan behind, and the comparison below would read that nan as close enough
 	if is_nan(apart):
 		return "got %s, expected %s, which cannot be measured apart" % [got, expected]
 	if apart > tolerance:
 		return "got %s, expected %s (+/- %s)" % [got, expected, tolerance]
 	return ""
 
-# floats never compare exactly, so every numeric check goes through a tolerance
 func check_near(name, got, expected, tolerance = 0.0001):
 	var reason = _near_reason(got, expected, tolerance)
 	if reason == "":
@@ -159,8 +126,7 @@ func _near_array_reason(got, expected, tolerance):
 	if got.size() != expected.size():
 		return "got %d values, expected %d" % [got.size(), expected.size()]
 	for i in got.size():
-		# every element through the very rule check_near() uses, rather than a second
-		# copy of it: one copy is how the two came to disagree about a nan
+		# every element through the very rule check_near() uses, rather than a second copy of it: one copy is how the two came to disagree about a nan
 		if _near_reason(got[i], expected[i], tolerance) != "":
 			return "got %s, expected %s (+/- %s)" % [got, expected, tolerance]
 	return ""
