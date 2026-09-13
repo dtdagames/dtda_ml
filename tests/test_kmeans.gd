@@ -1,16 +1,13 @@
 # DTDAKMeans, the k-means clustering.
 
-# how many assertions this suite runs, checked by the runner
 const PLAN = 62
 
-# a file this model reads from end to end, which every guard below breaks in exactly
-# one place: two fields wrong at once and either guard could be the one answering
+# a file this model reads from end to end, which every guard below breaks in exactly one place: two fields wrong at once and either guard could be the one answering
 const SOUND = '{"model": "DTDAKMeans", "version": 1, "k": 2, "max_iterations": 100, "num_runs": 5, "inertia": 1.5, "centroids": [[0.0, 1.0], [5.0, 6.0]], "scaler": {"mode": 0, "offsets": [0.0, 0.0], "scales": [1.0, 1.0]}}'
 const CENTRES_FIELD = '"centroids": [[0.0, 1.0], [5.0, 6.0]]'
 const SCALER_FIELD = '"scaler": {"mode": 0, "offsets": [0.0, 0.0], "scales": [1.0, 1.0]}'
 
-# Three blobs, far apart, built by arithmetic and not by a generator, so the data is
-# the same on every engine whatever its random stream or its number formatting.
+# three blobs, far apart, built by arithmetic and not by a generator, so the data is the same on every engine whatever its random stream or its number formatting
 const BLOB_CENTRES = [[0.0, 0.0], [10.0, 0.0], [5.0, 9.0]]
 
 func _blobs():
@@ -24,8 +21,7 @@ func _blobs():
 			planted.push_back(b)
 	return [X, planted]
 
-# four blobs strung along a line, close enough that a single run often settles on a
-# grouping that is not the best one. This is where several runs earn their keep
+# four blobs strung along a line, close enough that a single run often settles on a grouping that is not the best one: this is where several runs earn their keep
 func _line():
 	var X = []
 	var centres = [0.0, 3.0, 6.0, 9.0]
@@ -35,16 +31,14 @@ func _line():
 			X.push_back([centres[b] + ((i * 7) % 5) * 0.4 - 0.8, ((i * 11) % 5) * 0.4 - 0.8])
 	return X
 
-# column 0 says nothing about the groups and is written in whatever unit is asked for,
-# column 1 is where the groups actually live
+# column 0 says nothing about the groups and is written in whatever unit is asked for, column 1 is where the groups actually live
 func _mixed(factor):
 	var X = []
 	for i in 18:
 		X.push_back([(1.0 + float(i % 2)) * factor, float((i % 3) * 5) + ((i * 7) % 3) * 0.1])
 	return X
 
-# the same grouping, whatever number each group happens to have been given: k-means
-# has no reason to hand out 0, 1 and 2 in any particular order
+# the same grouping, whatever number each group happens to have been given: k-means has no reason to hand out 0, 1 and 2 in any particular order
 func _same_partition(a, b):
 	if a.size() != b.size():
 		return false
@@ -93,9 +87,7 @@ func _run(t):
 	t.check_equal("_fit_predict is _fit then _predict", twin.fit_predict(X), groups)
 
 	t.section("K-Means, finding a structure that was planted")
-	# The point of the model, and it is exact rather than statistical: three blobs far
-	# apart are recovered on every one of forty seeds, so this counts the misses and
-	# expects none. A single seed would prove nothing about the next one
+	# the point of the model, and it is exact rather than statistical: three blobs far apart are recovered on every one of forty seeds, so this counts the misses and expects none, where a single seed would prove nothing about the next one
 	var missed = 0
 	for s in 40:
 		var trial = DTDAKMeans.new(3)
@@ -103,7 +95,6 @@ func _run(t):
 		if not _same_partition(trial.fit_predict(X), planted):
 			missed += 1
 	t.check_equal("forty seeds, forty times the planted grouping", missed, 0)
-	# and the centres come back where they were planted, in the unit of the data
 	var centres = km.get_centroids()
 	t.check_equal("one centre per group", centres.size(), 3)
 	var unplaced = 0
@@ -118,11 +109,7 @@ func _run(t):
 			unplaced += 1
 	t.check_equal("every planted centre has a learned centre on it", unplaced, 0)
 
-	# What the iteration is for. A converged fit has every centre sitting exactly on
-	# the middle of the rows it holds; a fit that never moved its centres would leave
-	# them on the rows the start happened to pick, and could still hand out the right
-	# grouping by luck. Standardising is affine, so the middle can be taken in the
-	# unit of the data and compared against what get_centroids() answers
+	# what the iteration is for: a converged fit has every centre sitting exactly on the middle of the rows it holds, where a fit that never moved its centres would leave them on the rows the start happened to pick and could still hand out the right grouping by luck. Standardising is affine, so the middle can be taken in the unit of the data and compared against what get_centroids() answers
 	var learned = km.get_centroids()
 	var off_centre = 0
 	for c in learned.size():
@@ -135,22 +122,14 @@ func _run(t):
 				count += 1
 		if count == 0:
 			continue
-		# 1e-9 is far tighter than any move the iteration would still have to make on
-		# columns counted in units, and loose enough not to rest on the last bit
-		# asked the way round that counts a centre only when it is provably on the
-		# middle: a nan answers false to every comparison, so disqualifying by "too
-		# far" would read a centre that is not a number at all as landing exactly right
+		# 1e-9 is far tighter than any move the iteration would still have to make on columns counted in units, and loose enough not to rest on the last bit; asked the way round that counts a centre only when it is provably on the middle, since a nan answers false to every comparison and disqualifying by "too far" would read a centre that is not a number at all as landing exactly right
 		var first_on = abs(learned[c][0] - totals[0] / float(count)) <= 1e-9
 		var second_on = abs(learned[c][1] - totals[1] / float(count)) <= 1e-9
 		if not (first_on and second_on):
 			off_centre += 1
 	t.check_equal("every centre sits on the middle of what it holds", off_centre, 0)
 
-	# fit() works on rows packed into contiguous float arrays, which is faster on the
-	# inner loops and is not a type anything else here understands: a PackedFloat64Array
-	# is not an Array, typeof() answers differently, comparing the two raises, and
-	# _check_number_array() would turn one away. So what fit() leaves behind has to be
-	# a plain Array, and this is what says so
+	# fit() works on rows packed into contiguous float arrays, faster on the inner loops and not a type anything else here understands: a PackedFloat64Array is not an Array, typeof() answers differently, comparing the two raises, and _check_number_array() would turn one away. So what fit() leaves behind has to be a plain Array
 	t.check_equal("the centres are a plain Array", typeof(km.centroids), TYPE_ARRAY)
 	var packed_rows = 0
 	for centre in km.centroids:
@@ -160,8 +139,7 @@ func _run(t):
 	t.check_equal("so a fitted model still saves", km.save("user://dtda_ml_test_kmeans_packed.json"), true)
 
 	t.section("K-Means, the unit a column is written in")
-	# distances are euclidean, so without the scaler inside, a column multiplied by a
-	# thousand would drown the column the groups actually live in
+	# distances are euclidean, so without the scaler inside, a column multiplied by a thousand would drown the column the groups actually live in
 	var small = DTDAKMeans.new(3)
 	small.set_seed(4)
 	var small_groups = small.fit_predict(_mixed(1.0))
@@ -173,8 +151,7 @@ func _run(t):
 	t.section("K-Means, inertia")
 	# no tolerance: fit() leaves behind the very number inertia_of() computes
 	t.check_near("_fit leaves the inertia of the rows it was given", km.inertia_of(X), km.inertia, 0.0)
-	# one group has to hold everything, three groups hold three blobs: the gap is the
-	# whole spread of the data against nothing at all
+	# one group has to hold everything, three groups hold three blobs: the gap is the whole spread of the data against nothing at all
 	var lump = DTDAKMeans.new(1)
 	lump.set_seed(1)
 	lump.fit(X)
@@ -186,8 +163,7 @@ func _run(t):
 	t.check_near("a group per row leaves nothing to measure", each.inertia, 0.0, 1e-9)
 
 	t.section("K-Means, running several times over")
-	# Run one of several starts from the very same generator state as a lone run, so
-	# more runs can never do worse. That one is exact and holds seed by seed
+	# run one of several starts from the very same generator state as a lone run, so more runs can never do worse: that one is exact and holds seed by seed
 	var line = _line()
 	var worse = 0
 	var better = 0
@@ -198,25 +174,17 @@ func _run(t):
 		var many = DTDAKMeans.new(4, 100, 8)
 		many.set_seed(s + 1)
 		many.fit(line)
-		# the same way round, and for the same reason: an inertia that is not provably
-		# no worse counts as worse, a nan included
+		# the same way round, and for the same reason: an inertia that is not provably no worse counts as worse, a nan included
 		if not (many.inertia <= one.inertia + 1e-9):
 			worse += 1
 		if many.inertia < one.inertia - 1e-9:
 			better += 1
 	t.check_equal("more runs are never worse than one", worse, 0)
-	# and they are not idle either. Measured over sixty seeds on this data, eight runs
-	# beat one on fifty five of them; the worst group of twelve seeds was ten, so six
-	# is far below anything seen and far above nothing
+	# and they are not idle either: measured over sixty seeds on this data, eight runs beat one on fifty five of them, the worst group of twelve seeds was ten, so six is far below anything seen and far above nothing
 	t.check("and on this data they are usually better", better >= 6)
 
 	t.section("K-Means, where the centres start")
-	# k-means++ weighs a row by its distance to the nearest centre already chosen, so
-	# a row that is already a centre weighs nothing and the draw does not return it.
-	# These twenty four rows are all distinct, so the draw is all there is to it, the
-	# fallback for data with fewer distinct rows than k being tested further down.
-	# One draw of three out of twenty four would repeat by chance too rarely to
-	# notice, two hundred draws leave a careless draw no way through
+	# k-means++ weighs a row by its distance to the nearest centre already chosen, so a row that is already a centre weighs nothing and the draw does not return it. These twenty four rows are all distinct, so the draw is all there is to it, the fallback for data with fewer distinct rows than k being tested further down; one draw of three out of twenty four would repeat by chance too rarely to notice, two hundred draws leave a careless draw no way through
 	var scaler = DTDAScaler.new()
 	var scaled = scaler.fit_transform(X)
 	var starter = DTDAKMeans.new(3)
@@ -271,8 +239,7 @@ func _run(t):
 	t.check("and the groups still follow the column that does",
 		flat_groups[0] == flat_groups[1] and flat_groups[2] == flat_groups[3] and flat_groups[0] != flat_groups[2])
 
-	# rows that are all the same leave the start with nothing to spread out over, and
-	# the fit still owes k centres rather than the one it could get away with
+	# rows that are all the same leave the start with nothing to spread out over, and the fit still owes k centres rather than the one it could get away with
 	var same_rows = DTDAKMeans.new(3)
 	same_rows.set_seed(1)
 	var same_groups = same_rows.fit_predict([[5.0, 5.0], [5.0, 5.0], [5.0, 5.0], [5.0, 5.0]])
@@ -280,29 +247,21 @@ func _run(t):
 	t.check_near("and leave nothing to measure", same_rows.inertia, 0.0, 1e-9)
 	t.check_equal("with every row in the same group", same_groups, [0, 0, 0, 0])
 
-	# Two values and three groups. k-means++ runs out of distance to spread the starts
-	# over, the fallback takes a row that is already a centre, two centres land on the
-	# same spot and the third group is left holding nothing. A group holding nothing
-	# keeps the centre it had rather than being moved anywhere, so every centre stays
-	# on one of the two values the data holds and none of them drifts to the middle.
-	# Twenty seeds rather than one, the first draw deciding which value comes first
+	# two values and three groups: k-means++ runs out of distance to spread the starts over, the fallback takes a row that is already a centre, two centres land on the same spot and the third group is left holding nothing. A group holding nothing keeps the centre it had rather than being moved anywhere, so every centre stays on one of the two values and none drifts to the middle. Twenty seeds rather than one, the first draw deciding which value comes first
 	var adrift = 0
 	for s in 20:
 		var starved = DTDAKMeans.new(3)
 		starved.set_seed(s + 1)
 		starved.fit([[0.0], [0.0], [10.0], [10.0]])
 		for centre in starved.get_centroids():
-			# asked the way round that counts a centre only when it is provably on
-			# one of the two values: every comparison against a nan answers false,
-			# so the other way round would let a nan through as if it were fine
+			# asked the way round that counts a centre only when it is provably on one of the two values: every comparison against a nan answers false, so the other way round would let a nan through as if it were fine
 			var on_a_value = abs(centre[0]) <= 1e-9 or abs(centre[0] - 10.0) <= 1e-9
 			if not on_a_value:
 				adrift += 1
 	t.check_equal("a group left holding nothing keeps the centre it had", adrift, 0)
 
 	t.section("K-Means, a fit that is refused changes nothing")
-	# the one this lot started from: a nan in a row made every run answer a nan
-	# inertia, no run was ever kept, and the centres were replaced by nothing at all
+	# the one this lot started from: a nan in a row made every run answer a nan inertia, no run was ever kept, and the centres were replaced by nothing at all
 	var zero = 0.0
 	var nan_row = [[1.0, 2.0], [2.0, 1.0], [8.0, zero / zero]]
 	var inf_row = [[1.0, 2.0], [2.0, 1.0], [8.0, 1.0 / zero]]
@@ -327,9 +286,7 @@ func _run(t):
 	var back = DTDAKMeans.new()
 	t.check("K-Means _load reports a success", back.load(path))
 	t.check_equal("a reloaded model answers the same groups", back.predict(X), km.predict(X))
-	# 1e-9 is far tighter than anything the model could get wrong on a centre whose
-	# columns are counted in units, and loose enough not to rest on how the engine
-	# happens to write a float down
+	# 1e-9 is far tighter than anything the model could get wrong on a centre whose columns are counted in units, and loose enough not to rest on how the engine happens to write a float down
 	t.check_near_array("and holds the same centres, in the unit of the data",
 		back.get_centroids()[0], km.get_centroids()[0], 1e-9)
 	t.check_near("the inertia comes back", back.inertia, km.inertia, 1e-9)
@@ -353,8 +310,7 @@ func _run(t):
 	var no_run = DTDAKMeans.new(2, 100, 0)
 	no_run.fit(X)
 	t.check_empty("_fit for no run at all leaves it unfitted", no_run.predict([[1.0, 2.0]]))
-	# and a fit that is refused leaves a model that was working exactly as it was,
-	# the way a refused file does. Four different refusals answer for this one
+	# and a fit that is refused leaves a model that was working exactly as it was, the way a refused file does; four different refusals answer for this one
 	var standing = DTDAKMeans.new(3)
 	standing.set_seed(1)
 	standing.fit(X)
@@ -379,15 +335,12 @@ func _run(t):
 	t.check_equal("K-Means _load refuses another kind of model", km.load(other_path), false)
 	t.check_equal("K-Means _load refuses a missing file",
 		km.load("user://no_such_kmeans.json"), false)
-	# a file a model could read from end to end, wrong on the "model" field alone: the
-	# KNN file above is turned away by the guards on the structure long before the
-	# name is ever weighed
+	# a file a model could read from end to end, wrong on the "model" field alone: the KNN file above is turned away by the guards on the structure long before the name is ever weighed
 	t.check_equal("DTDAKMeans refuses a file that only lies about its model name",
 		_load_written(SOUND.replace("DTDAKMeans", "NotAKMeans"), km), false)
 	t.check_equal("K-Means _load refuses another format version",
 		_load_written(SOUND.replace('"version": 1', '"version": 99'), km), false)
-	# check_equal against false, not "not <call>": a call that raises answers null,
-	# and "not null" is true, which would turn a crash into a pass
+	# check_equal against false, not "not <call>": a call that raises answers null, and "not null" is true, which would turn a crash into a pass
 	t.check_equal("_load refuses centres that are not a list",
 		_load_written(SOUND.replace(CENTRES_FIELD, '"centroids": 5'), km), false)
 	t.check_equal("_load refuses an empty list of centres",
@@ -400,12 +353,9 @@ func _run(t):
 		_load_written(SOUND.replace('"inertia": 1.5', '"inertia": "nope"'), km), false)
 	t.check_equal("_load refuses a scaler it cannot use",
 		_load_written(SOUND.replace(SCALER_FIELD, '"scaler": {"mode": 0, "offsets": [0.0, 0.0], "scales": [1.0, 0.0]}'), km), false)
-	# predict() scales a row and then measures it against the centres: a scaler of
-	# two columns and centres of three would read past the end of one of them
+	# predict() scales a row and then measures it against the centres: a scaler of two columns and centres of three would read past the end of one of them
 	t.check_equal("_load refuses a scaler as wide as the centres are not",
 		_load_written(SOUND.replace(CENTRES_FIELD, '"centroids": [[0.0, 1.0, 2.0], [3.0, 4.0, 5.0]]'), km), false)
-	# and none of those refusals may take the standing model down with it: every one
-	# of them above was handed to km, the model fitted at the top of this suite, so
-	# the two lines below are answering for eleven different refusals and not for one
+	# and none of those refusals may take the standing model down with it: every one of them above was handed to km, the model fitted at the top of this suite, so the two lines below are answering for eleven different refusals and not for one
 	t.check_equal("a refused file leaves the model answering as before", km.predict(X), groups)
 	t.check_near("and leaves its inertia alone", km.inertia_of(X), km.inertia, 0.0)

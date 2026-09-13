@@ -2,7 +2,6 @@ extends DTDATools
 
 class_name DTDAKNN
 
-# === KNN model === #
 var X
 var Y
 var num_neighbors: int
@@ -33,9 +32,7 @@ func _get_neighbors(test_row) -> Array:
 	return neighbors
 
 func fit(newX, newY) -> bool:
-	# The rows are weighed before a single field is written: a fit that took them as
-	# they came would leave a working model holding a nan, or half rewritten by a
-	# raise in the middle. Answers false when it refuses, true when it fitted
+	# the rows are weighed before a single field is written: a fit that took them as they came would leave a working model holding a nan, or half rewritten by a raise in the middle
 	if not _check_matrix(newX, "DTDAKNN"):
 		return false
 	if not _check_labels(newX, newY, "DTDAKNN"):
@@ -51,8 +48,7 @@ func _majority_vote(output_values):
 		counts[value] = counts.get(value, 0) + 1
 	var tempPred = output_values[0]
 	var best_count: int = 0
-	# output_values is ordered from the closest to the farthest neighbor,
-	# so a strict comparison keeps the closest label on equality
+	# output_values is ordered from the closest to the farthest neighbor, so a strict comparison keeps the closest label on equality
 	for value in output_values:
 		if counts[value] > best_count:
 			tempPred = value
@@ -85,13 +81,8 @@ func to_dict():
 func from_dict(data):
 	if not _check_model_name(data, "DTDAKNN"):
 		return false
-	# Everything is read aside first and only takes the place of the standing model
-	# once the whole file is known to be readable. A file lives in user://, where it
-	# can be edited by hand, and a training set that is a text used to load with a
-	# success and fall apart at the first prediction
-	# _get_neighbors() counts this out at every prediction, so it belongs with X and Y
-	# and not with the settings fit() reads: a text answered null, and a count of
-	# zero or less answered a list of nulls, in both cases after loading with a success
+	# everything is read aside first and only takes the place of the standing model once the whole file is known to be readable: a file lives in user://, where it can be edited by hand, and a training set that is a text used to load with a success and fall apart at the first prediction
+	# _get_neighbors() counts k out at every prediction, so it belongs with X and Y and not with the settings fit() reads: a text answered null, and a count of zero or less a list of nulls, both after loading with a success
 	var saved_k = data.get("num_neighbors", num_neighbors)
 	if not _check_number(saved_k, "DTDAKNN", "neighbour count"):
 		return false
@@ -106,8 +97,7 @@ func from_dict(data):
 	if saved_X.size() == 0 or saved_X.size() != saved_Y.size():
 		push_error("DTDAKNN: the saved model holds %d rows and %d labels" % [saved_X.size(), saved_Y.size()])
 		return false
-	# _euclidean_distance() subtracts one row from another, column by column. The
-	# labels are left alone, a KNN answers them as they come and they can be anything
+		# _euclidean_distance() subtracts one row from another, column by column; the labels are left alone, a KNN answers them as they come and they can be anything
 	for row in saved_X:
 		if not _check_number_array(row, "DTDAKNN", "training row"):
 			return false
@@ -117,18 +107,10 @@ func from_dict(data):
 	return true
 
 
-# === The older names === #
-# Every method above used to carry a leading underscore, which in Godot marks a
-# method as virtual or private: the engine calls _ready() and _process(), you do not.
-# The names below are the ones that shipped, kept working so nothing that already
-# calls them breaks. They only forward. Prefer the ones without the underscore.
+# the older underscored spellings, kept working for what already calls them; they only forward
 
 func _fit(newX, newY):
 	return fit(newX, newY)
 
 func _predict(newX):
 	return predict(newX)
-
-
-
-# === End KNN model === #

@@ -2,7 +2,6 @@ extends DTDATools
 
 class_name DTDASVM
 
-# === SVM model === #
 var m: int = 0
 var n: int = 0
 var lr: float
@@ -18,9 +17,7 @@ func _init(learning_rate: float = 0.01, lambda_param: float = 0.01, n_iters: int
 	iter = n_iters
 
 func fit_begin(newX, newY) -> bool:
-	# The rows are weighed before a single field is written: a fit that took them as
-	# they came would leave a working model holding a nan, or half rewritten by a
-	# raise in the middle. Answers false when it refuses, true when it fitted
+	# the rows are weighed before a single field is written: a fit that took them as they came would leave a working model holding a nan, or half rewritten by a raise in the middle
 	if not _check_matrix(newX, "DTDASVM"):
 		return false
 	if not _check_labels(newX, newY, "DTDASVM"):
@@ -28,8 +25,7 @@ func fit_begin(newX, newY) -> bool:
 	# the descent multiplies by the label, so it has to be a number
 	if not _check_number_array(newY, "DTDASVM", "labels"):
 		return false
-	# the slice is one pass over the rows, and the passes run on their own copy:
-	# a training abandoned halfway leaves the model with the weights it already had
+	# the slice is one pass over the rows, and the passes run on their own copy: a training abandoned halfway leaves the model with the weights it already had
 	# standardized features, the descent is unstable otherwise
 	var pending := DTDAScaler.new()
 	var start_W: Array = []
@@ -68,13 +64,11 @@ func fit_step() -> float:
 	_fit_work = null
 	return 1.0
 
-# training in one go: begin, then step until there is nothing left
 func fit(newX, newY) -> bool:
 	if not fit_begin(newX, newY):
 		return false
 	return _fit_every_step()
 
-# one pass over every row, on the weights the work is holding
 func _one_pass(work: Dictionary) -> void:
 	var X = work["X"]
 	var y2 = work["y2"]
@@ -123,11 +117,8 @@ func to_dict():
 func from_dict(data):
 	if not _check_model_name(data, "DTDASVM"):
 		return false
-	# Everything is read aside first and only takes the place of the standing model
-	# once the whole file is known to be readable. Assigning as it went used to leave
-	# a working model with the weights of a file it had just refused
-	# absent, malformed and unusable answer the same way: a null is not a list either,
-	# and predict() computes with every one of these numbers
+	# everything is read aside first and only takes the place of the standing model once the whole file is known to be readable: assigning as it went used to leave a working model with the weights of a file it had just refused
+	# absent, malformed and unusable answer the same way: a null is not a list either, and predict() computes with every one of these numbers
 	var saved_W = data.get("W")
 	if not _check_number_array(saved_W, "DTDASVM", "weights"):
 		return false
@@ -147,18 +138,10 @@ func from_dict(data):
 	return true
 
 
-# === The older names === #
-# Every method above used to carry a leading underscore, which in Godot marks a
-# method as virtual or private: the engine calls _ready() and _process(), you do not.
-# The names below are the ones that shipped, kept working so nothing that already
-# calls them breaks. They only forward. Prefer the ones without the underscore.
+# the older underscored spellings, kept working for what already calls them; they only forward
 
 func _fit(newX, newY):
 	return fit(newX, newY)
 
 func _predict(newX):
 	return predict(newX)
-
-
-
-# === End SVM model === #

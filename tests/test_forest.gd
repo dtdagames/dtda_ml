@@ -20,13 +20,10 @@ const DATA_LOGR = [
 	[2, 2, 4, 0, 1, 1, 1],
 ]
 
-# how many assertions this suite runs, checked by the runner
 const PLAN = 54
 
-# A noisy world with one feature that matters and five that do not.
-# The label follows x0 alone, and one row in eight carries the wrong one: that is the
-# noise a deep tree memorises. Built by arithmetic and not by a generator, so the data
-# is the same on every engine, whatever its random stream or its number formatting.
+# A noisy world with one feature that matters and five that do not: the label follows x0 alone, and one row in eight carries the wrong one, which is the noise a deep tree memorises.
+# Built by arithmetic and not by a generator, so the data is the same on every engine, whatever its random stream or its number formatting.
 const NOISE_FEATURES = 5
 
 func _rows(first, count, flip_every):
@@ -92,16 +89,14 @@ func _run(t):
 	var voter = DTDAForest.new(3, 2, 2, DTDAForest.CLASSIFIER)
 	t.check_equal("the majority label wins", voter._combine([0, 1, 1]), 1)
 	t.check_equal("a lone dissenter loses", voter._combine([5, 5, 5, 2]), 5)
-	# a tie has to break somewhere, and it breaks on the first tree, so the same
-	# forest asked the same question twice answers the same thing twice
+	# a tie has to break somewhere, and it breaks on the first tree, so the same forest asked the same question twice answers the same thing twice
 	t.check_equal("a tie goes to the first tree", voter._combine([1, 0]), 1)
 	var averager = DTDAForest.new(3, 2, 2, DTDAForest.REGRESSOR)
 	t.check_near("the regressor averages instead of voting", averager._combine([1.0, 2.0, 6.0]), 3.0)
 
 	t.section("Random forest, bagging")
 	var noisy = _rows(0, 48, 8)
-	# every feature offered to every split, so nothing but the draw of rows can tell
-	# these trees apart. They still differ, which is bagging doing its work
+	# every feature offered to every split, so nothing but the draw of rows can tell these trees apart; they still differ, which is bagging doing its work
 	var bagged = DTDAForest.new(6, 6, 2, DTDAForest.CLASSIFIER, 99)
 	bagged.set_seed(3)
 	bagged.fit(noisy[0], noisy[1])
@@ -116,8 +111,7 @@ func _run(t):
 	t.section("Random forest, how many features a split may look at")
 	var classifier = DTDAForest.new(5, 3, 2, DTDAForest.CLASSIFIER)
 	var regressor_rule = DTDAForest.new(5, 3, 2, DTDAForest.REGRESSOR)
-	# the usual rule: the square root when classifying, a third when regressing.
-	# 16 features tells the two apart, 4 against 5
+	# the usual rule: the square root when classifying, a third when regressing; 16 features tells the two apart, 4 against 5
 	t.check_equal("a classifier looks at the square root of them", classifier._resolved_max_features(16), 4)
 	t.check_equal("a regressor looks at a third of them", regressor_rule._resolved_max_features(16), 5)
 	# floored, and never down to nothing whatever the count
@@ -145,19 +139,15 @@ func _run(t):
 	t.check_equal("_reset replays the same draws", twin_a.predict(held_out[0]), before_reset)
 
 	t.section("Random forest, generalisation")
-	# a deep tree on noisy labels learns the noise by heart: it answers every training
-	# row right, including the ones whose label is wrong, and pays for it on rows it
-	# has never seen
+	# a deep tree on noisy labels learns the noise by heart: it answers every training row right, including the ones whose label is wrong, and pays for it on rows it has never seen
 	var lone = DTDATree.new(8, 2, DTDATree.CLASSIFIER)
 	lone.fit(noisy[0], noisy[1])
 	var lone_train = ml.accuracy(lone.predict(noisy[0]), noisy[1])
 	var lone_test = ml.accuracy(lone.predict(held_out[0]), held_out[1])
 	t.check_near("a deep tree memorises its training set", lone_train, 100.0)
 	t.check("and does worse on rows it never saw", lone_test < lone_train)
-	# averaged over five seeds, not measured on one: this test set holds 48 rows, so a
-	# single row is worth 2.08 points and one forest can land level with the tree.
-	# the average over five was measured on eight disjoint groups of seeds, from +8.34
-	# to +10.84 points, so 3.0 sits far below anything seen and far above nothing
+	# averaged over five seeds, not measured on one: this test set holds 48 rows, so a single row is worth 2.08 points and one forest can land level with the tree.
+	# the average over five was measured on eight disjoint groups of seeds, from +8.34 to +10.84 points, so 3.0 sits far below anything seen and far above nothing
 	var total = 0.0
 	for k in 5:
 		var trial = DTDAForest.new(25, 8, 2, DTDAForest.CLASSIFIER)
@@ -188,8 +178,7 @@ func _run(t):
 		steady.predict(X_log), steady_before)
 	t.check_equal("a regressor forest refuses labels that are not numbers",
 		DTDAForest.new(3, 3, 2, DTDAForest.REGRESSOR).fit([[1.0], [2.0]], ["red", "blue"]), false)
-	# and the other side of that line: classifying, a forest only counts labels and
-	# votes among them, so a label naming a class is not a fault
+	# and the other side of that line: classifying, a forest only counts labels and votes among them, so a label naming a class is not a fault
 	var named = DTDAForest.new(5, 3, 2, DTDAForest.CLASSIFIER)
 	named.set_seed(1)
 	t.check_equal("a classifier forest takes labels that name a class",
@@ -235,16 +224,13 @@ func _run(t):
 	t.check_equal("_load refuses another kind of model", DTDAForest.new().load(other_path), false)
 	t.check_equal("_load refuses a missing file",
 		DTDAForest.new().load("user://no_such_forest.json"), false)
-	# check_equal against false, not "not <call>": a call that raises answers null,
-	# and "not null" is true, which would turn a crash into a pass
-	# a readable forest in every respect but its version, so nothing else can answer
-	# for the version check
+	# check_equal against false, not "not <call>": a call that raises answers null, and "not null" is true, which would turn a crash into a pass
+	# a readable forest in every respect but its version, so nothing else can answer for the version check
 	t.check_equal("_load refuses another format version",
 		_load_written('{"model": "DTDAForest", "version": 99, "trees": [{"model": "DTDATree", "version": 1, "root": {"leaf": 1}}]}'), false)
 	t.check_equal("_load refuses a file with no trees at all",
 		_load_written('{"model": "DTDAForest", "version": 1}'), false)
-	# a number rather than a dictionary of trees: a dictionary would be caught further
-	# down when its entries turn out not to be trees, and would prove nothing here
+	# a number rather than a dictionary of trees: a dictionary would be caught further down when its entries turn out not to be trees, and would prove nothing here
 	t.check_equal("_load refuses trees that are not a list",
 		_load_written('{"model": "DTDAForest", "version": 1, "trees": 5}'), false)
 	t.check_equal("_load refuses an empty list of trees",
@@ -254,8 +240,7 @@ func _run(t):
 	# the forest hands each entry to DTDATree, whose own guards answer for it
 	t.check_equal("_load refuses a tree whose root is not a node",
 		_load_written('{"model": "DTDAForest", "version": 1, "trees": [{"model": "DTDATree", "version": 1, "root": "nope"}]}'), false)
-	# a file a forest could read from end to end, wrong on the "model" field alone:
-	# the DTDAKNN file above is turned away by the guards on the structure
+	# a file a forest could read from end to end, wrong on the "model" field alone: the DTDAKNN file above is turned away by the guards on the structure
 	t.check_equal("DTDAForest refuses a file that only lies about its model name",
 		_load_written('{"model": "NotAForest", "version": 1, "mode": 0, "num_trees": 1, "max_depth": 5, "min_samples_split": 2, "max_features": 0, "trees": [{"model": "DTDATree", "version": 1, "root": {"leaf": 1}}]}'), false)
 	t.check_equal("_load refuses a list holding something that is not a tree",

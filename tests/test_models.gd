@@ -42,7 +42,6 @@ func _scale_rows(rows, factor):
 			scaled[i].push_back(rows[i][u] * factor)
 	return scaled
 
-# how many assertions this suite runs, checked by the runner
 const PLAN = 79
 
 # write a handmade file and hand it to a model, for the guards on the file itself
@@ -65,8 +64,7 @@ func _run(t):
 		[4, 1, 1, 0, 1, 0],
 	]), [3, 6, 5])
 
-	# the two nearest neighbours out of three carry label 1, the closest carries 0.
-	# a 1-NN would answer 0, the majority vote answers 1
+	# the two nearest neighbours out of three carry label 1, the closest carries 0: a 1-NN would answer 0, the majority vote answers 1
 	var voter = DTDAKNN.new(3)
 	voter.fit([[0.1], [0.5], [0.6]], [0, 1, 1])
 	t.check_near_array("takes the majority, not the closest neighbour", voter.predict([[0.0]]), [1])
@@ -130,8 +128,7 @@ func _run(t):
 
 	var knn_path = "user://dtda_ml_test_knn.json"
 	t.check("KNN saves", knn.save(knn_path))
-	# built with a different count on purpose: a receiver already holding 3 would load
-	# the same 3 whether _from_dict assigns it or not, and the field would go unpinned
+	# built with a different count on purpose: a receiver already holding 3 would load the same 3 whether _from_dict assigns it or not, and the field would go unpinned
 	var knn_back = DTDAKNN.new(1)
 	t.check("KNN loads", knn_back.load(knn_path))
 	t.check_equal("a reloaded KNN takes the neighbour count from the file", knn_back.num_neighbors, 3)
@@ -140,16 +137,12 @@ func _run(t):
 	t.section("Persistence guards (the errors below are expected)")
 	# a linear regression must refuse a file holding a KNN
 	var wrong = DTDALinReg.new(0.01, 1000)
-	# check_equal against false, not "not <call>": a call that raises a script error
-	# answers null, which "not" reads as a success
+	# check_equal against false, not "not <call>": a call that raises a script error answers null, which "not" reads as a success
 	t.check_equal("_load refuses another kind of model", wrong.load(knn_path), false)
 	t.check_equal("_load refuses a missing file", DTDALinReg.new(0.01, 1000).load("user://does_not_exist.json"), false)
 	t.check_equal("_save refuses a model that was never fitted", DTDALinReg.new(0.01, 1000).save(path), false)
 
-	# The KNN file just refused is a KNN through and through, so what turns it away is
-	# the shape of what it holds, not the name it carries: the assertion above says
-	# nothing about _check_model_name(). Each file below is one its model could read
-	# from end to end, and wrong on the "model" field alone
+	# the KNN file just refused is a KNN through and through, so what turns it away is the shape of what it holds, not the name it carries: the assertion above says nothing about _check_model_name(). Each file below is one its model could read from end to end, and wrong on the "model" field alone
 	t.check_equal("DTDAKNN refuses a file that only lies about its model name",
 		_load_written('{"model": "NotAKNN", "version": 1, "num_neighbors": 1, "X": [[0]], "Y": [1]}',
 			DTDAKNN.new(3)), false)
@@ -164,9 +157,7 @@ func _run(t):
 			DTDASVM.new(0.01, 0.01, 1000)), false)
 
 	t.section("Persistence, a refused file changes nothing (the errors below are expected)")
-	# A scaler that holds a zero divides by it at the first prediction. That file used
-	# to load with a success and answer inf, and the three models below wrote the
-	# weights of a file they went on to refuse over the ones they were working with.
+	# a scaler that holds a zero divides by it at the first prediction: that file used to load with a success and answer inf, and the three models below wrote the weights of a file they went on to refuse over the ones they were working with
 	var zero_x = '"x_scaler": {"mode": 0, "offsets": [0.0], "scales": [0.0]}, "y_scaler": {"mode": 0, "offsets": [0.0], "scales": [1.0]}'
 	var zero_s = '"scaler": {"mode": 0, "offsets": [0.0], "scales": [0.0]}'
 
@@ -190,25 +181,19 @@ func _run(t):
 			svm), false)
 	t.check_near_array("and SVM predicts what it predicted before",
 		svm.predict(CLASS_TEST), svm_before)
-	# and no hyperparameter of the refused file either: each of the three was built
-	# with a rate of 0.01 and 1000 rounds, the refused files carry 0.5 and 3
+	# and no hyperparameter of the refused file either: each of the three was built with a rate of 0.01 and 1000 rounds, the refused files carry 0.5 and 3
 	t.check_equal("no scrap of the refused file is left behind",
 		[linreg.rate, logreg.iterations, svm.iter], [0.01, 1000, 1000])
 
 	t.section("Persistence, weights read out of a file (the errors below are expected)")
-	# predict() computes with every one of these numbers, so a file that holds a text
-	# or an empty list where the weights belong is not usable. It used to load: with a
-	# text _load answered null after a cascade, with a list of the wrong shape it
-	# answered true and the model was ruined either way
+	# predict() computes with every one of these numbers, so a file holding a text or an empty list where the weights belong is not usable. It used to load: with a text _load answered null after a cascade, with a list of the wrong shape it answered true, and the model was ruined either way
 	t.check_equal("LinReg refuses weights that are not a list",
 		_load_written('{"model": "DTDALinReg", "version": 1, "W": "nope", ' + '"x_scaler": {"mode": 0, "offsets": [0.0], "scales": [1.0]}, "y_scaler": {"mode": 0, "offsets": [0.0], "scales": [1.0]}' + '}', DTDALinReg.new(0.01, 1000)), false)
 	t.check_equal("LinReg refuses an empty list of weights",
 		_load_written('{"model": "DTDALinReg", "version": 1, "W": [], ' + '"x_scaler": {"mode": 0, "offsets": [0.0], "scales": [1.0]}, "y_scaler": {"mode": 0, "offsets": [0.0], "scales": [1.0]}' + '}', DTDALinReg.new(0.01, 1000)), false)
 	t.check_equal("LinReg refuses weights holding something that is not a number",
 		_load_written('{"model": "DTDALinReg", "version": 1, "W": [1.0, "nope"], ' + '"x_scaler": {"mode": 0, "offsets": [0.0], "scales": [1.0]}, "y_scaler": {"mode": 0, "offsets": [0.0], "scales": [1.0]}' + '}', DTDALinReg.new(0.01, 1000)), false)
-	# the one way a number that is not finite reaches this far: a literal too large for
-	# a float, which JSON hands back as an infinity. A literal nan or inf in the file
-	# would make it unreadable and never get here at all
+	# the one way a number that is not finite reaches this far: a literal too large for a float, which JSON hands back as an infinity. A literal nan or inf in the file would make it unreadable and never get here at all
 	t.check_equal("LinReg refuses a weight too large to hold",
 		_load_written('{"model": "DTDALinReg", "version": 1, "W": [1e400], "b": 0.0, ' + '"x_scaler": {"mode": 0, "offsets": [0.0], "scales": [1.0]}, "y_scaler": {"mode": 0, "offsets": [0.0], "scales": [1.0]}' + '}', DTDALinReg.new(0.01, 1000)), false)
 	t.check_equal("LinReg refuses an intercept that is not a number",
@@ -223,9 +208,7 @@ func _run(t):
 		_load_written('{"model": "DTDASVM", "version": 1, "W": [1.0], "b": "nope", ' + '"scaler": {"mode": 0, "offsets": [0.0], "scales": [1.0]}' + '}', DTDASVM.new(0.01, 0.01, 1000)), false)
 
 	t.section("Persistence, a refused file changes nothing (the errors below are expected)")
-	# The invariant, and it must not hang on one door. The files below carry a sound
-	# scaler and are refused for their weights alone, where the ones further down are
-	# refused for a scaler holding a zero. Both have to leave the model untouched
+	# the invariant, and it must not hang on one door: the files below carry a sound scaler and are refused for their weights alone, where the ones further down are refused for a scaler holding a zero. Both have to leave the model untouched
 	var linreg_weights = linreg.predict([[7.2], [9.0], [11.1]])
 	t.check_equal("a file with unusable weights is refused",
 		_load_written('{"model": "DTDALinReg", "version": 1, "rate": 0.5, "iterations": 3, "W": ["nope"], "b": 7.7, ' + '"x_scaler": {"mode": 0, "offsets": [0.0], "scales": [1.0]}, "y_scaler": {"mode": 0, "offsets": [0.0], "scales": [1.0]}' + '}',
@@ -246,12 +229,9 @@ func _run(t):
 		svm.predict(CLASS_TEST), svm_weights)
 
 	t.section("Persistence, a KNN training set read out of a file (the errors below are expected)")
-	# a KNN answers with the rows it kept, so those rows have to be rows of numbers.
-	# A training set that is a text used to load with a success and only fall apart at
-	# the first prediction. The labels are left alone, a KNN answers them as they come
+	# a KNN answers with the rows it kept, so those rows have to be rows of numbers: a training set that is a text used to load with a success and only fall apart at the first prediction. The labels are left alone, a KNN answers them as they come
 	var knn_before = knn.predict(CLASS_TEST)
-	# two files rather than one holding two texts: with both fields wrong, either half
-	# of the check answers for the other and neither assertion names its own guard
+	# two files rather than one holding two texts: with both fields wrong, either half of the check answers for the other and neither assertion names its own guard
 	t.check_equal("KNN refuses training rows that are not a list",
 		_load_written('{"model": "DTDAKNN", "version": 1, "num_neighbors": 1, "X": "nope", "Y": [3]}', knn), false)
 	t.check_equal("KNN refuses labels that are not a list",
@@ -262,8 +242,7 @@ func _run(t):
 		_load_written('{"model": "DTDAKNN", "version": 1, "num_neighbors": 1, "X": [[0], [1]], "Y": [3]}', knn), false)
 	t.check_equal("KNN refuses a row that is not a row of numbers",
 		_load_written('{"model": "DTDAKNN", "version": 1, "num_neighbors": 1, "X": [[0], ["nope"]], "Y": [3, 4]}', knn), false)
-	# the neighbour count is read at every prediction, not at fit(): a text used to
-	# load with a success and answer null, a count of zero a list of nulls
+	# the neighbour count is read at every prediction, not at fit(): a text used to load with a success and answer null, a count of zero a list of nulls
 	t.check_equal("KNN refuses a neighbour count that is not a number",
 		_load_written('{"model": "DTDAKNN", "version": 1, "num_neighbors": "nope", "X": [[0]], "Y": [3]}', knn), false)
 	t.check_equal("KNN refuses a neighbour count below one",
@@ -272,9 +251,7 @@ func _run(t):
 		knn.predict(CLASS_TEST), knn_before)
 
 	t.section("A fit that is refused changes nothing (the errors below are expected)")
-	# fit() is handed whatever the caller computed, and one unlucky division upstream
-	# is enough: a nan in a row used to travel into the weights and stay there, every
-	# prediction answering nan from then on without a word. No file is needed for this.
+	# fit() is handed whatever the caller computed, and one unlucky division upstream is enough: a nan in a row used to travel into the weights and stay there, every prediction answering nan from then on without a word. No file is needed for this.
 	# Four different faults per model, so the invariant does not hang on one of them
 	var zero = 0.0
 	var nan_row = [[1.0, 2.0], [2.0, 1.0], [8.0, zero / zero]]
@@ -293,10 +270,7 @@ func _run(t):
 	knn.fit(text_row, three)
 	t.check_near_array("KNN answers what it answered before those four",
 		knn.predict(knn_probe), knn_fit_before)
-	# The other side of the same line, and the one the README puts first: a KNN only
-	# hands a label back, so a label naming a class is not a fault and must not be
-	# refused. Without this, tightening the three fits that do weigh their labels into
-	# all seven would go through without an objection
+	# the other side of the same line, and the one the README puts first: a KNN only hands a label back, so a label naming a class is not a fault and must not be refused. Without this, tightening the three fits that do weigh their labels into all seven would go through without an objection
 	var named = DTDAKNN.new(1)
 	t.check_equal("KNN takes labels that name a class",
 		named.fit([[0.0, 0.0], [0.5, 0.5], [9.0, 9.0], [9.5, 9.5]], ["cave", "cave", "camp", "camp"]), true)

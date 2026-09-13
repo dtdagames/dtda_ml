@@ -1,12 +1,9 @@
 extends Node2D
 
-# The playable demo: two runs of the same agent, side by side, looping forever.
-# Left, its very first episode, before it knows anything. Right, the policy it learned
-# from four hundred of them. Nothing is narrated - the contrast is the whole point, and
-# it is visible in about ten seconds.
-#
-# The learning itself happens once in _ready() and takes a few milliseconds; what runs
-# per frame is only a replay of two recorded paths.
+# The playable demo: two runs of the same agent side by side, looping forever. Left, its very
+# first episode, before it knows anything. Right, the policy learned from four hundred of them.
+# Nothing is narrated, the contrast is the point. The learning happens once in _ready() and
+# takes a few milliseconds; what runs per frame is only a replay of two recorded paths.
 
 const CELL := 34
 const MARGIN := 28
@@ -44,9 +41,7 @@ func _process(delta: float) -> void:
 	elapsed += delta
 	queue_redraw()
 
-# How far along its own path each side is. They loop independently, so the trained
-# agent arrives again and again while the untrained one is still wandering - which
-# says more than a caption would.
+# How far along its own path each side is. They loop independently, so the trained agent arrives again and again while the untrained one is still wandering, which says more than a caption would.
 func _cursor(path: Array) -> int:
 	if path.size() < 2:
 		return 0
@@ -62,8 +57,7 @@ func _draw() -> void:
 	if world == null:
 		return
 	var font := ThemeDB.fallback_font
-	# the whole viewport, not a computed box: a background sized by hand leaves a bar
-	# of the engine grey along whichever edge the arithmetic got wrong
+	# the whole viewport, not a computed box: a background sized by hand leaves a bar of the engine grey along whichever edge the arithmetic got wrong
 	draw_rect(get_viewport_rect(), BACKGROUND)
 
 	draw_string(font, Vector2(MARGIN, 44), "A Q-Learning agent, before and after",
@@ -96,8 +90,7 @@ func _draw_panel(index: int, path: Array, agent_color: Color, title: String, sub
 			else:
 				draw_rect(rect, FLOOR)
 
-	# where it has already been, so a wandering run reads as wandering rather than as
-	# a dot moving at random
+	# where it has already been, so a wandering run reads as wandering rather than as a dot moving at random
 	for i in cursor + 1:
 		var cell: Vector2i = path[i]
 		if world.is_goal(cell):
@@ -112,8 +105,7 @@ func _draw_panel(index: int, path: Array, agent_color: Color, title: String, sub
 	draw_string(font, origin + Vector2(0, world.height * CELL + 18),
 		"step %d of %d" % [cursor, path.size() - 1], HORIZONTAL_ALIGNMENT_LEFT, -1, 13, TEXT_DIM)
 
-# Steps per episode over the whole training. It is the only part of the picture that
-# shows the learning happening rather than its result.
+# Steps per episode over the whole training, the only part of the picture that shows the learning happening rather than its result.
 func _draw_curve(font: Font) -> void:
 	# two points at least: the polyline divides by size() - 1
 	if lengths.size() < 2:

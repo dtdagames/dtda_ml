@@ -1,11 +1,5 @@
-# The names the addon answers to.
-#
-# Every method a user calls used to carry a leading underscore, which in Godot marks
-# a method as virtual or private. They have lost it, and the older names are kept as
-# wrappers so that nothing already written breaks. This suite drives every one of
-# those wrappers: the day one is dropped by accident, it says so.
+# The names the addon answers to. Every method a user calls used to carry a leading underscore, which in Godot marks a method as virtual or private; they have lost it, and the older names are kept as wrappers so nothing already written breaks. This suite drives every one of those wrappers: the day one is dropped by accident, it says so.
 
-# how many assertions this suite runs, checked by the runner
 const PLAN = 55
 
 const X = [[1.0, 2.0], [2.0, 1.0], [8.0, 9.0], [9.0, 8.0], [3.0, 3.0], [7.0, 7.0]]
@@ -25,10 +19,7 @@ func _run(t):
 	t.check("DTDATools is what the toolbox is called now", DTDATools.new() != null)
 	t.check_near("the older name still carries the toolbox", MLTools.new().accuracy([1, 1], [1, 1]), 100.0)
 	t.check("a model is a DTDATools", DTDAKNN.new(1) is DTDATools)
-	# and the one thing the older name cannot keep: the models extend DTDATools, not
-	# the subclass that carries the old name. This is here so the README can say it
-	# through a box, because the parser settles this one on its own otherwise and
-	# refuses to compile the comparison at all, which is a firmer answer than false
+	# and the one thing the older name cannot keep: the models extend DTDATools, not the subclass that carries the old name. Boxed because the parser settles this one on its own otherwise and refuses to compile the comparison at all, which is a firmer answer than false
 	var boxed = [DTDAKNN.new(1)]
 	t.check_equal("a model is no longer an MLTools", boxed[0] is MLTools, false)
 
@@ -56,16 +47,14 @@ func _run(t):
 		scaler.inverse_transform([[0.0, 0.0]]))
 
 	t.section("Names, fitting and predicting")
-	# every model, through the older names alone, has to end up where the new ones do
-	# named one by one rather than in a bare loop, so a failure says which model
+	# every model, through the older names alone, has to end up where the new ones do; named one by one rather than in a bare loop, so a failure says which model
 	for pair in [["KNN", DTDAKNN.new(1)], ["LinReg", DTDALinReg.new(0.01, 50)],
 			["LogReg", DTDALogReg.new(0.01, 50)], ["SVM", DTDASVM.new(0.01, 0.01, 50)],
 			["Tree", DTDATree.new(3, 2, DTDATree.CLASSIFIER)]]:
 		t.check_equal("%s _fit still fits" % pair[0], pair[1]._fit(X, Y), true)
 		t.check_equal("%s _predict answers what predict answers" % pair[0],
 			pair[1]._predict(PROBE), pair[1].predict(PROBE))
-	# the seed is read straight off the model rather than through an outcome: on six
-	# tidy rows every seed grows the same forest, so an outcome would notice nothing
+	# the seed is read straight off the model rather than through an outcome: on six tidy rows every seed grows the same forest, so an outcome would notice nothing
 	var forest = DTDAForest.new(3, 3, 2, DTDAForest.CLASSIFIER)
 	forest._set_seed(4)
 	t.check_equal("_set_seed on a forest", forest.start_seed, 4)
@@ -74,9 +63,7 @@ func _run(t):
 	forest._reset()
 	t.check_empty("_reset on a forest", forest.predict(PROBE))
 
-	# a tree only draws features when max_features asks it to, so that is where its
-	# seed shows. One of two features, twenty times over: a generator that was never
-	# seeded has no way of matching that
+	# a tree only draws features when max_features asks it to, so that is where its seed shows: one of two features, twenty times over, which a generator that was never seeded has no way of matching
 	var drawer = DTDATree.new(3, 2, DTDATree.CLASSIFIER, 1)
 	drawer.fit(X, Y)
 	drawer._set_seed(9)
@@ -90,18 +77,9 @@ func _run(t):
 		twin_drawn.append_array(twin_tree._features_for_split())
 	t.check_equal("_set_seed on a tree", drawn, twin_drawn)
 
-	# What the notes in dtda_ml_tools_compat.gd promise: override predict() and the
-	# library reaches your override. It holds because fit_predict() calls predict()
-	# by name rather than doing the work itself, and that is a property of this code,
-	# not of the language.
-	#
-	# Do not drop this on the strength of the obvious mutation. Making fit_predict()
-	# call _predict() instead leaves it green, the older name forwarding to the
-	# override anyway, and it is tempting to conclude the assertion proves nothing.
-	# The mutation that shows it is inlining the body of predict() into fit_predict(),
-	# which saves a _check_fitted() and a dispatch the caller has just made redundant,
-	# and is exactly equivalent for everyone who does not subclass. That is the shape
-	# of the regression worth catching: invisible everywhere except where it breaks.
+	# What the compatibility notes promise: override predict() and the library reaches your override. It holds because fit_predict() calls predict() by name rather than doing the work itself, and that is a property of this code, not of the language.
+	# Do not drop this on the strength of the obvious mutation: making fit_predict() call _predict() instead leaves it green, the older name forwarding to the override anyway, and it is tempting to conclude the assertion proves nothing.
+	# The mutation that shows it is inlining the body of predict() into fit_predict(), which saves a _check_fitted() and a dispatch the caller has just made redundant, and is exactly equivalent for everyone who does not subclass: the shape of the regression worth catching, invisible everywhere except where it breaks.
 	var overridden = Overrider.new()
 	overridden.set_seed(1)
 	t.check_equal("the library reaches an override of predict, rather than inlining it",

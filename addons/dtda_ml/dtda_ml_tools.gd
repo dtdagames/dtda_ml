@@ -1,22 +1,17 @@
 class_name DTDATools
 
-# === Training a slice at a time === #
-# fit() runs to the end before it returns, which on a forest of 25 trees is several
-# seconds: a frozen frame, and a game cannot afford one. The same training can be
-# taken a slice at a time instead, one call per frame:
-#
+# fit() runs to the end before it returns, which on a forest of 25 trees is several seconds:
+# a frozen frame, and a game cannot afford one. The same training can be taken a slice at a
+# time instead, one call per frame:
 #   if model.fit_begin(X, y):
 #       while model.is_fitting():
 #           var done: float = model.fit_step()   # one slice, 0.0 to 1.0
-#
-# fit() is that loop and nothing more, so every model answers exactly what it always
-# did, and every assertion that calls fit() is exercising the stepping underneath.
-#
-# Nothing is written into the model until the last slice: the work in progress lives
-# here, apart, so a training that is abandoned or cancelled halfway leaves the model
-# it was going to replace exactly as it was. Either the old one whole or the new one
-# whole, never a half of each. It is the invariant that governs a refused fit and a
-# refused file, applied to time.
+# fit() is that loop and nothing more, so every model answers exactly what it always did and
+# every assertion that calls fit() exercises the stepping underneath. Nothing is written into
+# the model until the last slice: the work in progress lives here, apart, so a training
+# abandoned or cancelled halfway leaves the model it was going to replace exactly as it was.
+# Either the old one whole or the new one whole, never a half of each: the invariant of a
+# refused fit and a refused file, applied to time.
 var _fit_work = null
 
 func is_fitting() -> bool:
@@ -32,17 +27,14 @@ func fit_step() -> float:
 	_fit_work = null
 	return 1.0
 
-# the name a model answers to, for the messages above
 func _model_name() -> String:
 	return "DTDATools"
 
-# what fit() is: begin, then step until there is nothing left
 func _fit_every_step() -> bool:
 	while is_fitting():
 		fit_step()
 	return true
 
-# shared check for every function comparing predictions to expected labels
 func _check_pair(caller: String, y_pred, y_test) -> bool:
 	if y_pred.size() == 0:
 		push_error("DTDATools: %s called without any prediction" % caller)
@@ -57,10 +49,10 @@ func get_perf(y_pred, y_test, type: int) -> float:
 	if not _check_pair("get_perf()", y_pred, y_test):
 		return 0.0
 
-	# convert >0.5 to 1 from prediction for linear regression
+	# a linear regression answers a continuous value, brought back to a label at 0.5
 	if type == 1:
 		y_pred = _normalize_int(y_pred)
-	# convert 0 to -1 from test for SVM
+	# an SVM works in -1/1 where the labels are 0/1
 	if type == 3:
 		y_pred = _normalize_negative(y_pred)
 		y_test = _normalize_negative(y_test)
@@ -74,14 +66,12 @@ func get_perf(y_pred, y_test, type: int) -> float:
 	
 	return snapped(float(correctly_classified) / float(count) *100, 0.01)
 
-# convert array from float to int
 func array_to_int(arr) -> Array:
 	var tempData = []
 	for i in arr:
 		tempData.push_back(int(i))
 	return tempData
 
-# convert 0 to -1 from array
 func _normalize_negative(tempData) -> Array:
 	var newData = []
 	for row in tempData:
@@ -89,7 +79,6 @@ func _normalize_negative(tempData) -> Array:
 			row = -1
 		newData.push_back(row)
 	return newData
-# convert >0.5 to 1 from array
 func _normalize_int(tempData) -> Array:
 	var newData = []
 	for row in tempData:
@@ -99,7 +88,7 @@ func _normalize_int(tempData) -> Array:
 			row = 0
 		newData.push_back(row)
 	return newData
-# convert value to -1/1 from array, a value sitting exactly on the boundary goes to 1
+# a value sitting exactly on the boundary goes to 1
 func _sign_array(x) -> Array:
 	var matrix = []
 	for row in x:
@@ -110,14 +99,12 @@ func _sign_array(x) -> Array:
 		matrix.push_back(row)
 	return matrix
 
-# return array with specific column
 func get_variable(tempData, tempColumnId: int) -> Array:
 	var newData = []
 	for row in tempData:
 		newData.push_back(row[tempColumnId])
 	return newData
 
-# return array without specific column
 func drop_variable(tempData, tempColumnId: int) -> Array:
 	var newData = []
 	for i in tempData.size():
@@ -127,40 +114,34 @@ func drop_variable(tempData, tempColumnId: int) -> Array:
 				newData[i].push_back(tempData[i][u])
 	return newData
 
-# return array of zeros
 func _array_zeros(n: int) -> Array:
 	var tempW: Array = []
 	for i in n:
 		tempW.push_back(0)
 	return tempW
 
-# return substract of two arrays
 func _substract_arrays(x1, x2) -> Array:
 	var matrix: Array = []
 	for i in x1.size():
 		matrix.push_back(x1[i] - x2[i])
 	return matrix
-# return substract of array and const
 func _sub_arrays_const(x1, b: float) -> Array:
 	var matrix: Array = []
 	for i in x1.size():
 		matrix.push_back(x1[i] - b)
 	return matrix
 
-# add array by constant
 func _add_arrays_const(x1, b: float) -> Array:
 	var matrix: Array = []
 	for i in x1.size():
 		matrix.push_back(x1[i] + b)
 	return matrix
 
-# mutliply rows of array by coef
 func _multiply_array_coef(x1, b: float) -> Array:
 	var matrix: Array = []
 	for i in x1.size():
 		matrix.push_back(x1[i] * b)
 	return matrix
-# divide rows of array by coef
 # float() so a division between two integers does not discard the decimal part
 func _divide_array_coef(x1, b: float) -> Array:
 	var matrix: Array = []
@@ -168,21 +149,18 @@ func _divide_array_coef(x1, b: float) -> Array:
 		matrix.push_back(x1[i] / float(b))
 	return matrix
 
-# divide coef by rows
 func _divide_inverse_array_coef(x1, b: float) -> Array:
 	var matrix: Array = []
 	for i in x1.size():
 		matrix.push_back(float(b) / x1[i])
 	return matrix
 
-# return rows of array by exp
 func _exp_array_(x1) -> Array:
 	var matrix: Array = []
 	for i in x1.size():
 		matrix.push_back(exp(x1[i]))
 	return matrix
 
-# return dot product of two arrays
 func _dot_product(x1, x2) -> Array:
 	var matrix: Array = []
 	for i in x1.size():
@@ -191,7 +169,6 @@ func _dot_product(x1, x2) -> Array:
 			res += x1[i][u] * x2[u]
 		matrix.push_back(res)
 	return matrix
-# return dor product of array and const
 func _dot_product_simple(x1, x2) -> Array:
 	var matrix: Array = []
 	var res: float = 0.0
@@ -200,7 +177,6 @@ func _dot_product_simple(x1, x2) -> Array:
 	matrix.push_back(res)
 	return matrix
 
-# transpose array
 func _transpose_array(x) -> Array:
 	var matrix: Array = []
 	for i in x[0].size():
@@ -208,27 +184,24 @@ func _transpose_array(x) -> Array:
 		for u in x.size():
 			matrix[i].push_back(x[u][i])
 	return matrix
-# transpose 1D array
 func _transpose_simple_array(x) -> Array:
 	var matrix: Array = []
 	for i in x.size():
 		matrix.push_back(x[i])
 	return matrix
 
-# return sum of all rows
 func _sum_array(x) -> float:
 	var total: float = 0.0
 	for i in x.size():
 		total += x[i]
 	return total
 
-# return mean of all rows
 func _mean_array(x) -> float:
 	if x.size() == 0:
 		return 0.0
 	return float(_sum_array(x)) / float(x.size())
 
-# return standard deviation of all rows, 1.0 when constant so it stays safe to divide by
+# standard deviation, 1.0 when the column is constant so it stays safe to divide by
 func _std_array(x) -> float:
 	if x.size() == 0:
 		return 1.0
@@ -255,16 +228,12 @@ func _column_to_matrix(x) -> Array:
 		matrix.push_back([x[i]])
 	return matrix
 
-# unwrap a single column matrix back into a 1D array
 func _matrix_to_column(x) -> Array:
 	var column: Array = []
 	for i in x.size():
 		column.push_back(x[i][0])
 	return column
 
-# === Classification metrics === #
-
-# percentage of correct answers
 func accuracy(y_pred, y_test) -> float:
 	if not _check_pair("accuracy()", y_pred, y_test):
 		return 0.0
@@ -292,7 +261,6 @@ func confusion_matrix(y_pred, y_test, positive = 1) -> Dictionary:
 			counts["tn"] += 1
 	return counts
 
-# share of the predicted positives that are right, from 0 to 1
 func precision(y_pred, y_test, positive = 1) -> float:
 	var counts = confusion_matrix(y_pred, y_test, positive)
 	if counts.is_empty():
@@ -303,7 +271,6 @@ func precision(y_pred, y_test, positive = 1) -> float:
 		return 0.0
 	return snapped(float(counts["tp"]) / float(predicted), 0.0001)
 
-# share of the real positives that were found, from 0 to 1
 func recall(y_pred, y_test, positive = 1) -> float:
 	var counts = confusion_matrix(y_pred, y_test, positive)
 	if counts.is_empty():
@@ -313,7 +280,6 @@ func recall(y_pred, y_test, positive = 1) -> float:
 		return 0.0
 	return snapped(float(counts["tp"]) / float(actual), 0.0001)
 
-# harmonic mean of precision and recall, from 0 to 1
 func f1_score(y_pred, y_test, positive = 1) -> float:
 	var p = precision(y_pred, y_test, positive)
 	var r = recall(y_pred, y_test, positive)
@@ -321,9 +287,6 @@ func f1_score(y_pred, y_test, positive = 1) -> float:
 		return 0.0
 	return snapped(2 * p * r / (p + r), 0.0001)
 
-# === Regression metrics === #
-
-# mean squared error
 func mse(y_pred, y_test) -> float:
 	if not _check_pair("mse()", y_pred, y_test):
 		return 0.0
@@ -345,8 +308,7 @@ func mae(y_pred, y_test) -> float:
 		total += abs(y_test[i] - y_pred[i])
 	return total / float(y_pred.size())
 
-# share of the variance explained by the model, 1.0 is a perfect fit
-# a model worse than always answering the mean scores below 0
+# share of the variance explained, 1.0 a perfect fit; worse than always answering the mean scores below 0
 func r2_score(y_pred, y_test) -> float:
 	if not _check_pair("r2_score()", y_pred, y_test):
 		return 0.0
@@ -361,9 +323,6 @@ func r2_score(y_pred, y_test) -> float:
 		return 0.0
 	return snapped(1.0 - residual / total, 0.0001)
 
-# === Saving and loading === #
-
-# overridden by every model
 func to_dict() -> Dictionary:
 	push_error("DTDATools: this class cannot be saved")
 	return {}
@@ -372,16 +331,12 @@ func from_dict(_data) -> bool:
 	push_error("DTDATools: this class cannot be loaded")
 	return false
 
-# A number a model read out of a file has to be one, not merely present. A file lives
-# in user://, where it can be edited by hand, and a text where a number belongs would
-# load and only fall apart at the first prediction
+# a number read out of a file has to be one: a file lives in user://, where it can be edited by hand, and a text where a number belongs would load and only fall apart at the first prediction
 func _check_number(value, model_name: String, field: String) -> bool:
 	if not (typeof(value) in [TYPE_INT, TYPE_FLOAT]):
 		push_error("%s: the saved %s is not a number" % [model_name, field])
 		return false
-	# a nan and an inf carry a numeric type and are not numbers anything can compute
-	# with: a nan answers false to every comparison and spreads through every weight
-	# it touches without a word
+	# a nan and an inf carry a numeric type and are not numbers anything can compute with: a nan answers false to every comparison and spreads through every weight it touches without a word
 	if typeof(value) == TYPE_FLOAT and not is_finite(value):
 		push_error("%s: the saved %s is %s, which is not a number to compute with" % [model_name, field, value])
 		return false
@@ -404,10 +359,7 @@ func _check_number_array(values, model_name: String, field: String) -> bool:
 			return false
 	return true
 
-# What fit() is handed has to be something it can compute with, and it arrives from
-# the caller rather than from a file: one unlucky division upstream is enough. A model
-# that was working must not be left holding a nan, or half rewritten by a fit that
-# raised in the middle, so the rows are weighed before anything is written down
+# what fit() is handed comes from the caller rather than from a file, where one unlucky division upstream is enough: the rows are weighed before anything is written down, so a working model is never left holding a nan or half rewritten by a fit that raised in the middle
 func _check_matrix(X, model_name: String) -> bool:
 	if typeof(X) != TYPE_ARRAY or X.size() == 0:
 		push_error("%s: fit() got no rows to learn from" % model_name)
@@ -423,9 +375,7 @@ func _check_matrix(X, model_name: String) -> bool:
 			return false
 	return true
 
-# as many labels as there are rows. What the labels hold is left alone: a KNN answers
-# them back as they came and a classifier only counts them, so a label can be a string
-# and often is. The models that do arithmetic on a label weigh it themselves
+# as many labels as there are rows. What the labels hold is left alone: a KNN answers them back as they came and a classifier only counts them, so a label can be a string, and often is
 func _check_labels(X, y, model_name: String) -> bool:
 	if typeof(y) != TYPE_ARRAY:
 		push_error("%s: fit() got labels that are not a list" % model_name)
@@ -443,13 +393,10 @@ func _check_model_name(data, expected: String) -> bool:
 		return false
 	return true
 
-# write a trained model to a JSON file, returns true on success
-# use a user:// path, res:// is read only once the game is exported
-#
-# No self. on the calls to this one, and that is not an oversight: there is no global
-# save() for a bare save(path) to reach, so it finds this method. Its neighbour load()
-# has a global of the same name, which wins, and every call to it is qualified for
-# that reason alone. Do not even them up.
+# write a trained model to a JSON file, returns true on success; use a user:// path, res:// is read only once the game is exported.
+# No self. on the calls to this one, and that is not an oversight: there is no global save()
+# for a bare save(path) to reach, so it finds this method. Its neighbour load() has a global
+# of the same name, which wins, and every call to it is qualified for that reason alone.
 func save(path: String) -> bool:
 	var data = to_dict()
 	if data.is_empty():
@@ -463,7 +410,6 @@ func save(path: String) -> bool:
 	file.close()
 	return true
 
-# read a model back from a JSON file, returns true on success
 func load(path: String) -> bool:
 	if not FileAccess.file_exists(path):
 		push_error("DTDATools: %s does not exist" % path)
@@ -479,11 +425,7 @@ func load(path: String) -> bool:
 		return false
 	return from_dict(data)
 
-# === The older names === #
-# Every method above used to carry a leading underscore, which in Godot marks a
-# method as virtual or private: the engine calls _ready() and _process(), you do not.
-# The names below are the ones that shipped, kept working so nothing that already
-# calls them breaks. They only forward. Prefer the ones without the underscore.
+# the older underscored spellings, kept working for what already calls them; they only forward
 
 func _get_perf(y_pred, y_test, type):
 	return get_perf(y_pred, y_test, type)
@@ -530,8 +472,6 @@ func _from_dict(_data):
 func _save(path):
 	return save(path)
 
-# self. is not decoration here: load() on its own is the engine global that reads
-# a resource, and it wins over a method of the same name inside the class. From
-# outside, model.load(path) reaches this one, the way ConfigFile.load() does
+# self. is not decoration here: a bare load() is the engine global that reads a resource and wins over a method of the same name; from outside, model.load(path) reaches this one
 func _load(path):
 	return self.load(path)

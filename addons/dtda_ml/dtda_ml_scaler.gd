@@ -2,9 +2,7 @@ extends DTDATools
 
 class_name DTDAScaler
 
-# === Feature scaler === #
-# STANDARD centers each column on its mean and divides it by its standard deviation
-# MINMAX brings each column into the [0, 1] range
+# STANDARD centers each column on its mean and divides by its standard deviation, MINMAX brings it into [0, 1]
 enum { STANDARD, MINMAX }
 
 var mode: int
@@ -15,7 +13,6 @@ var scales
 func _init(scaler_mode: int = STANDARD) -> void:
 	mode = scaler_mode
 
-# learn the offset and the scale of every column
 func fit(X) -> bool:
 	if X.size() == 0:
 		push_error("DTDAScaler: fit() called with no data")
@@ -26,11 +23,8 @@ func fit(X) -> bool:
 		if mode == MINMAX:
 			var low = column.min()
 			var high = column.max()
-			# float() is load bearing: on a column of integers, high - low would stay
-			# an integer and _transform would then do an integer division, so a value
-			# such as 40000 / 81000 would come out as 0 instead of 0.49
+			# float() is load bearing: on a column of integers, high - low would stay an integer and _transform would then do an integer division, 40000 / 81000 coming out as 0 instead of 0.49. The 1.0 below is there because a constant column would divide by zero
 			offsets.push_back(float(low))
-			# a constant column would divide by zero
 			scales.push_back(1.0 if high == low else float(high - low))
 		else:
 			offsets.push_back(_mean_array(column))
@@ -52,7 +46,6 @@ func fit_transform(X) -> Array:
 	fit(X)
 	return transform(X)
 
-# back to the unit of the data the scaler was fitted on
 func inverse_transform(X) -> Array:
 	if not _check_fitted("DTDAScaler", offsets, "inverse_transform()"):
 		return []
@@ -70,13 +63,7 @@ func to_dict() -> Dictionary:
 		"scales": scales,
 	}
 
-# A saved scaler has to be usable, not merely present. transform() reads an offset
-# and a scale per column and divides by the scale, so a file holding a string, a list
-# shorter than the other or a zero used to load without a word and only fall apart at
-# the first prediction, or worse answer inf. A model file lives in user://, where it
-# can be edited by hand.
-# Nothing is written into the scaler until the whole dictionary has been read, so a
-# refused one leaves a working scaler exactly as it was
+# A saved scaler has to be usable, not merely present: a file holding a string, a list shorter than the other or a zero scale used to load without a word and fall apart at the first prediction, or answer inf. Nothing is written into the scaler until the whole dictionary has been read, so a refused one leaves a working scaler exactly as it was.
 func from_dict(data) -> bool:
 	var saved_offsets = data.get("offsets")
 	var saved_scales = data.get("scales")
@@ -90,8 +77,7 @@ func from_dict(data) -> bool:
 		if not (typeof(saved_offsets[i]) in [TYPE_INT, TYPE_FLOAT] and typeof(saved_scales[i]) in [TYPE_INT, TYPE_FLOAT]):
 			push_error("DTDAScaler: the saved scaler holds something that is not a number")
 			return false
-		# transform() divides by this, and fit() never writes a zero there: a
-		# constant column is given a scale of 1.0 for that very reason
+		# transform() divides by this, and fit() never writes a zero there: a constant column is given a scale of 1.0 for that very reason
 		if float(saved_scales[i]) == 0.0:
 			push_error("DTDAScaler: the saved scaler holds a scale of zero")
 			return false
@@ -102,11 +88,7 @@ func from_dict(data) -> bool:
 	return true
 
 
-# === The older names === #
-# Every method above used to carry a leading underscore, which in Godot marks a
-# method as virtual or private: the engine calls _ready() and _process(), you do not.
-# The names below are the ones that shipped, kept working so nothing that already
-# calls them breaks. They only forward. Prefer the ones without the underscore.
+# the older underscored spellings, kept working for what already calls them; they only forward
 
 func _fit(X):
 	return fit(X)
@@ -120,6 +102,3 @@ func _fit_transform(X):
 func _inverse_transform(X):
 	return inverse_transform(X)
 
-
-
-# === End Feature scaler === #

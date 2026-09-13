@@ -153,9 +153,8 @@ func _tree_example():
 	print("Tree on a XOR: ", xor_tree.predict(xor_X), " expected ", xor_y)
 
 # A crowd of trees, each grown on its own draw of the rows and of the features.
-# The world below has one feature that decides the label and five that are pure noise,
-# and one row in eight carries the wrong label. That is what a lone deep tree learns
-# by heart, and what a forest refuses to.
+# The world below has one feature that decides the label and five that are pure noise, and
+# one row in eight carries the wrong label: what a lone deep tree learns by heart, and what a forest refuses to.
 func _forest_rows(first, count, flip_every):
 	var X = []
 	var y = []
@@ -181,9 +180,8 @@ func _forest_example():
 	print("Lone tree, on the rows it learned: ", mltools.accuracy(tree.predict(train[0]), train[1]), "%")
 	print("Lone tree, on rows it never saw: ", mltools.accuracy(tree.predict(unseen[0]), unseen[1]), "%")
 
-	# a test set of 48 rows means one row is worth two points, so a single forest can
-	# land level with the tree by luck. Five of them, seeded so the run repeats, is
-	# what the picture actually looks like
+	# a test set of 48 rows means one row is worth two points, so a single forest can land
+	# level with the tree by luck; five of them, seeded so the run repeats, is what the picture actually looks like
 	var total = 0.0
 	for k in 5:
 		var forest = DTDAForest.new(25, 8, 2, DTDAForest.CLASSIFIER)
@@ -282,8 +280,7 @@ func _qlearning_example():
 	var current = CORRIDOR_START
 	for step in 10:
 		var move = agent.predict(current, CORRIDOR_ACTIONS)
-		# predict() answers null on a room the agent never visited, where it has
-		# nothing to say: in a real game that is where you fall back on your own default
+		# predict() answers null on a room the agent never visited, where it has nothing to say: in a real game that is where you fall back on your own default
 		if move == null:
 			break
 		var result = _corridor_step(current, move)

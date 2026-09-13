@@ -1,27 +1,17 @@
 # DTDAQLearning, the tabular Q-learning agent.
 
-# A four room corridor: 0 - 1 - 2 - 3.
-# "right" moves one room up, "left" one room down, both blocked at the ends.
-# Entering room 3 ends the episode and pays 1, every other move pays 0.
+# a four room corridor 0 - 1 - 2 - 3: "right" moves one room up, "left" one down, both blocked at the ends; entering room 3 ends the episode and pays 1, every other move pays 0
 const GOAL = 3
 const ACTIONS = ["left", "right"]
 const GAMMA = 0.9
 
-# the optimal q values of that corridor, computed by hand with gamma = 0.9:
-#   V*(3) = 0, the episode is over
-#   Q*(2, right) = 1                     the reward, no future
-#   Q*(1, right) = 0.9 * V*(2) = 0.9     V*(2) = 1
-#   Q*(0, right) = 0.9 * V*(1) = 0.81    V*(1) = 0.9
-#   Q*(0, left)  = 0.9 * V*(0) = 0.729   staying in 0, V*(0) = 0.81
-#   Q*(1, left)  = 0.9 * V*(0) = 0.729
-#   Q*(2, left)  = 0.9 * V*(1) = 0.81
+# the optimal q values of that corridor, computed by hand with gamma = 0.9: V*(3) = 0 the episode being over, Q*(2, right) = 1 the reward with no future, Q*(1, right) = 0.9 * V*(2) = 0.9, Q*(0, right) = 0.9 * V*(1) = 0.81, Q*(0, left) = Q*(1, left) = 0.9 * V*(0) = 0.729, Q*(2, left) = 0.9 * V*(1) = 0.81
 const OPTIMAL = {
 	"0": {"left": 0.729, "right": 0.81},
 	"1": {"left": 0.729, "right": 0.9},
 	"2": {"left": 0.81, "right": 1.0},
 }
 
-# returns [next state, reward, done]
 func _step(state, action):
 	var next_state = clamp(state + (1 if action == "right" else -1), 0, GOAL)
 	return [next_state, 1.0 if next_state == GOAL else 0.0, next_state == GOAL]
@@ -49,24 +39,18 @@ func _load_written(content, agent = null):
 		agent = DTDAQLearning.new()
 	return agent.load(path)
 
-# how many assertions this suite runs, checked by the runner
 const PLAN = 89
 
 func _run(t):
 	t.section("Q-Learning, the Bellman update step by step")
-	# every number below is computed by hand, not read off the model
+	# every number below is computed by hand, not read off the model: first update on an empty table 0 + 0.5 * (1 + 0.9 * 0 - 0), then a terminal "b" 0 + 0.5 * 2, then "b" being worth 1.0 0.5 + 0.5 * (1 + 0.9 * 1.0 - 0.5), then 1.2 + 0.5 * (3 + 0.9 * 1.0 - 1.2) with an integer reward mixed in
 	var solo = DTDAQLearning.new(0.5, 0.9, 0.0)
-	# first update on an empty table: 0 + 0.5 * (1 + 0.9 * 0 - 0)
 	solo.learn("a", "go", 1, "b", ["go"], false)
 	t.check_near("an unknown next state carries no future value", solo.get_q("a", "go"), 0.5)
-	# "b" is terminal here: 0 + 0.5 * 2
 	solo.learn("b", "go", 2, "end", [], true)
 	t.check_near("a terminal transition is worth lr * reward", solo.get_q("b", "go"), 1.0)
-	# now "b" is worth 1.0: 0.5 + 0.5 * (1 + 0.9 * 1.0 - 0.5)
 	solo.learn("a", "go", 1, "b", ["go"], false)
 	t.check_near("the value of the next state flows back", solo.get_q("a", "go"), 1.2)
-	# the arithmetic of the update, with an integer reward mixed into it:
-	# 1.2 + 0.5 * (3 + 0.9 * 1.0 - 1.2)
 	solo.learn("a", "go", 3, "b", ["go"], false)
 	t.check_near("an integer reward mixes into the update without truncating", solo.get_q("a", "go"), 2.55)
 
@@ -77,23 +61,19 @@ func _run(t):
 	boot.learn("a", "go", 0, "b")
 	t.check_near("an omitted next action list still looks at the next state",
 		boot.get_q("a", "go"), 9.0)
-	# and a null one is read the same way, like _choose_action already does
 	var nulled = DTDAQLearning.new(1.0, 0.9, 0.0)
 	nulled.learn("b", "go", 10, "end", [], true)
 	nulled.learn("a", "go", 0, "b", null, false)
 	t.check_near("a null next action list behaves like an omitted one",
 		nulled.get_q("a", "go"), 9.0)
 	t.check_equal("_predict takes a null action list too", nulled.predict("b", null), "go")
-	# the fallback reads the row of the next state, not the whole table: a fortune
-	# learned in "c" must not raise what "a" expects from "b"
+	# the fallback reads the row of the next state, not the whole table: a fortune learned in "c" must not raise what "a" expects from "b"
 	boot.learn("c", "wait", 100, "end", [], true)
 	boot.learn("a", "go", 0, "b")
 	t.check_near("the fallback stays inside the next state", boot.get_q("a", "go"), 9.0)
 
 	t.section("Q-Learning, a reward that is not a number")
-	# a reward arrives from whatever the game computed, and it lands straight in the
-	# table. A nan there answers false to every comparison, so _best_action() can no
-	# longer name a best action for that state and predict() falls silent
+	# a reward arrives from whatever the game computed and lands straight in the table: a nan there answers false to every comparison, so _best_action() can no longer name a best action for that state and predict() falls silent
 	var zero = 0.0
 	var poisoned = DTDAQLearning.new(0.5, 0.9, 0.0)
 	poisoned.learn("room", "north", 10, "end", [], true)
@@ -110,10 +90,9 @@ func _run(t):
 	var term = DTDAQLearning.new(1.0, 0.9, 0.0)
 	term.learn("rich", "x", 10, "end", [], true)
 	t.check_near("a full learning rate takes the target as is", term.get_q("rich", "x"), 10.0)
-	# 1 + 0.9 * 10 when the transition continues
+	# 1 + 0.9 * 10 when the transition continues, and the very same transition marked terminal drops the 9.0 of future
 	term.learn("s", "go", 1, "rich", ["x"], false)
 	t.check_near("a normal transition adds the discounted future", term.get_q("s", "go"), 10.0)
-	# the very same transition marked terminal drops the 9.0 of future
 	term.learn("s", "stop", 1, "rich", ["x"], true)
 	t.check_near("a terminal transition ignores the next state", term.get_q("s", "stop"), 1.0)
 
@@ -127,7 +106,6 @@ func _run(t):
 				agent.get_q(int(state), action), OPTIMAL[state][action], 0.01)
 	t.check_equal("the learned policy walks to the goal",
 		[agent.predict(0), agent.predict(1), agent.predict(2)], ["right", "right", "right"])
-	# nothing was ever learned about the goal, the episode ends there
 	t.check_near("the terminal state stays empty", agent.get_q(GOAL, "right"), 0.0)
 
 	t.section("Q-Learning, exploitation and determinism")
@@ -151,7 +129,6 @@ func _run(t):
 	var seen = {}
 	for i in 200:
 		seen[explorer.choose_action(0, ACTIONS)] = true
-	# epsilon 1.0 ignores the q values entirely, both actions must show up
 	t.check_equal("epsilon 1 draws every action", seen.size(), 2)
 
 	t.section("Q-Learning, exploration decay")
@@ -160,19 +137,16 @@ func _run(t):
 	t.check_near("_decay_exploration returns the new rate", eps.decay_exploration(), 0.5)
 	eps.decay_exploration()
 	t.check_near("it decays once per episode", eps.exploration_rate, 0.25)
-	# 0.25 * 0.5 = 0.125, below the floor
 	eps.decay_exploration()
 	t.check_near("epsilon never goes below its floor", eps.exploration_rate, 0.2)
 	eps.decay_exploration()
 	t.check_near("and stays on the floor", eps.exploration_rate, 0.2)
-	# epsilon is a probability, a decay above 1 must not push it past "always explore"
 	var rising = DTDAQLearning.new(0.1, 0.9, 0.5, 2.0, 0.01)
 	rising.decay_exploration()
 	rising.decay_exploration()
 	rising.decay_exploration()
 	t.check_near("epsilon never goes above 1", rising.exploration_rate, 1.0)
-	# the same interval holds for what is asked at build time, floor included:
-	# a floor above 1 would otherwise contradict the range the class promises
+	# the same interval holds for what is asked at build time, floor included: a floor above 1 would otherwise contradict the range the class promises
 	var absurd = DTDAQLearning.new(0.1, 0.9, 5.0, 0.5, 1.5)
 	t.check_near("an exploration rate above 1 is brought back", absurd.exploration_rate, 1.0)
 	t.check_near("so is a floor above 1", absurd.min_exploration_rate, 1.0)
@@ -184,8 +158,7 @@ func _run(t):
 	eps.reset()
 	t.check_near("_reset puts the exploration back", eps.exploration_rate, 1.0)
 	t.check("_reset forgets the table", eps.q_table == null)
-	# a seeded agent must replay the very same run after a reset, otherwise the
-	# reproducibility set_seed() promises only holds until the first reset
+	# a seeded agent must replay the very same run after a reset, otherwise the reproducibility set_seed() promises only holds until the first reset
 	var replay = DTDAQLearning.new(0.1, 0.9, 1.0)
 	replay.set_seed(99)
 	var first_run = []
@@ -198,7 +171,6 @@ func _run(t):
 	t.check_equal("_reset replays the same random draws", second_run, first_run)
 
 	t.section("Q-Learning, arbitrary states and actions")
-	# states are not contiguous integers here, and never touch each other
 	var grid = DTDAQLearning.new(1.0, 0.9, 0.0)
 	grid.learn(Vector2i(3, -7), "north", 5, Vector2i(3, -6), [], true)
 	grid.learn(Vector2i(3, -7), "south", 1, Vector2i(3, -8), [], true)
@@ -206,34 +178,21 @@ func _run(t):
 	t.check_near("and its own values", grid.get_q(Vector2i(3, -7), "south"), 1.0)
 	t.check_near("an unvisited state is worth 0", grid.get_q(Vector2i(0, 0), "north"), 0.0)
 
-	# the price of keying by str(), pinned here so it stays a documented limit and not
-	# a surprise: two actions with the same str() are one and the same cell, and the
-	# type registry keeps the last one for the whole agent.
-	# the pair is the integer 2 and the string "2", not 2 and 2.0: str() of a whole
-	# float prints "2" up to Godot 4.3 and "2.0" from 4.4 on, so a float pair would
-	# pin the number formatting of the engine instead of the rule of the model.
-	# int and String have kept the same str() all along, and 2 next to "2" is the
-	# realistic mistake anyway, an action read from a config file next to one written
-	# in code
+	# the price of keying by str(), pinned here so it stays a documented limit and not a surprise: two actions with the same str() are one and the same cell, and the type registry keeps the last one for the whole agent.
+	# the pair is the integer 2 and the string "2", not 2 and 2.0: str() of a whole float prints "2" up to Godot 4.3 and "2.0" from 4.4, so a float pair would pin the number formatting of the engine instead of the rule of the model, and 2 next to "2" is the realistic mistake anyway
 	var collide = DTDAQLearning.new(1.0, 0.9, 0.0)
 	collide.learn("s", 2, 1, "end", [], true)
 	collide.learn("s", "2", 5, "end", [], true)
-	# through _known_actions() rather than q_table["s"], so the assertion asks how many
-	# cells that row holds without spelling the internal key out itself
 	t.check_equal("two actions with the same str() share one cell", collide._known_actions("s").size(), 1)
 	t.check_near("the second one overwrites the first", collide.get_q("s", 2), 5.0)
-	# this one is about the type registry alone, not about the collision: "2" was
-	# learned second and carries the higher q value, so it would come out on top of
-	# two separate cells just as well. The collision is what the two lines above pin
+	# this one is about the type registry alone, not about the collision: "2" was learned second and carries the higher q value, so it would come out on top of two separate cells just as well. The collision is what the two lines above pin
 	t.check_equal("and the last type learned wins", typeof(collide.predict("s")), TYPE_STRING)
-	# across two states there is no shared cell, the values stay apart...
 	var apart = DTDAQLearning.new(1.0, 0.9, 0.0)
 	apart.learn("roomA", 2, 1, "end", [], true)
 	apart.learn("roomB", "2", 5, "end", [], true)
 	t.check_equal("two states keep their own row for the same action key",
 		[apart.get_q("roomA", 2), apart.get_q("roomB", "2")], [1.0, 5.0])
-	# ...but the type registry is global: roomA played the integer 2 and is answered
-	# the string "2", no cell being shared. That one bites, "2" == 2 raises in GDScript
+	# ...but the type registry is global: roomA played the integer 2 and is answered the string "2", no cell being shared. That one bites, "2" == 2 raises in GDScript
 	t.check_equal("the type of an action is global to the agent",
 		typeof(apart.predict("roomA")), TYPE_STRING)
 
@@ -242,8 +201,6 @@ func _run(t):
 	t.check("_save reports a success", agent.save(path))
 	var back = DTDAQLearning.new()
 	t.check("_load reports a success", back.load(path))
-	# 1e-12 is far tighter than anything the model could get wrong, and still leaves room
-	# for the last digit the JSON writer drops
 	for state in OPTIMAL:
 		for action in ACTIONS:
 			t.check_near("Q(%s, %s) comes back untouched" % [state, action],
@@ -266,7 +223,6 @@ func _run(t):
 	t.check_equal("an integer action comes back with its value", picked, 2)
 	t.check("an integer action comes back as an int, not a string or a float",
 		typeof(picked) == TYPE_INT)
-	# a float action must not be rounded into an int on the way back
 	var mixed_path = "user://dtda_ml_test_qlearning_float.json"
 	var mixed = DTDAQLearning.new(1.0, 0.9, 0.0)
 	mixed.learn("hall", 0.5, 3, "end", [], true)
@@ -276,7 +232,6 @@ func _run(t):
 	t.check_equal("a float action keeps its type", typeof(mixed_back.predict("hall")), TYPE_FLOAT)
 	t.check_near("and its value", mixed_back.predict("hall"), 0.5)
 
-	# a StringName is a type of its own and must come back as one
 	var named_path = "user://dtda_ml_test_qlearning_name.json"
 	var named = DTDAQLearning.new(1.0, 0.9, 0.0)
 	named.learn("hall", &"jump", 1, "end", [], true)
@@ -286,13 +241,8 @@ func _run(t):
 	t.check_equal("a StringName action keeps its type",
 		typeof(named_back.predict("hall")), TYPE_STRING_NAME)
 
-	# a float key goes through str(), which may or may not carry every digit of a
-	# double depending on the engine. What the model owes is that the file adds
-	# nothing to that: the expectation is float(str(x)), not x, so the assertion
-	# stays out of the number formatting business where 4.3 and 4.4 differ. Both
-	# sides move together when str() changes, which is what makes it version proof.
-	# it is not str() compared with itself either: the left hand side went to disk
-	# and back through JSON, and a _key() rounding more than str() still fails here
+	# a float key goes through str(), which may or may not carry every digit of a double depending on the engine. What the model owes is that the file adds nothing to that: the expectation is float(str(x)), not x, so the assertion stays out of the number formatting business where 4.3 and 4.4 differ, both sides moving together when str() changes.
+	# it is not str() compared with itself either: the left hand side went to disk and back through JSON, and a _key() rounding more than str() still fails here
 	var third_path = "user://dtda_ml_test_qlearning_third.json"
 	var third = DTDAQLearning.new(1.0, 0.9, 0.0)
 	third.learn("hall", 1.0 / 3.0, 1, "end", [], true)
@@ -305,15 +255,12 @@ func _run(t):
 	t.check_near("a float key survives the file as well as str() allows",
 		third_back.predict("hall"), float(str(1.0 / 3.0)), 0.0)
 
-	# the type is written as a stable label, not as the raw value of an engine enum
 	var raw_file = FileAccess.open(numeric_path, FileAccess.READ)
 	var raw = JSON.parse_string(raw_file.get_as_text())
 	raw_file.close()
 	t.check_equal("the action type is written as a stable label", raw["actions"]["2"], "int")
-	# the format of that field changed with version 2, the field must say so
 	t.check_equal("the file announces its format version", int(raw["version"]), 2)
-	# a version 1 file holds raw enum values under "actions" and cannot be told apart
-	# from a version 2 one by its content: it must be refused, not read as strings
+	# a version 1 file holds raw enum values under "actions" and cannot be told apart from a version 2 one by its content: it must be refused, not read as strings
 	t.check_equal("_load refuses the format of version 1",
 		_load_written('{"model": "DTDAQLearning", "version": 1, "q_table": {"s": {"2": 1.0}}, "actions": {"2": 2}}'),
 		false)
@@ -331,31 +278,24 @@ func _run(t):
 	t.check("_choose_action without any valid action", agent.choose_action(0, []) == null)
 	t.check("_choose_action with a null action list", agent.choose_action(0, null) == null)
 	t.check("_predict on a state the agent never met", agent.predict("nowhere") == null)
-	# same answer with a list of actions: an unknown state is unknown either way, the
-	# agent must not dress up a tie between zeros as a learned policy
+	# same answer with a list of actions: an unknown state is unknown either way, the agent must not dress up a tie between zeros as a learned policy
 	t.check("_predict on an unknown state, actions given", agent.predict("nowhere", ACTIONS) == null)
-	# a state whose row was emptied by hand: the row is there, and it holds nothing
 	var hollow = DTDAQLearning.new()
 	t.check_equal("a state with an empty row still loads",
 		_load_written('{"model": "DTDAQLearning", "version": 2, "q_table": {"s": {}}}', hollow), true)
 	t.check("_predict on a state whose row is empty", hollow.predict("s") == null)
-	# a file written by another model, saved here so this suite stays self contained
 	var other = DTDAKNN.new(1)
 	other.fit([[0]], [1])
 	var other_path = "user://dtda_ml_test_not_a_qlearning.json"
 	other.save(other_path)
 	t.check_equal("_load refuses another kind of model", DTDAQLearning.new().load(other_path), false)
 	t.check_equal("_load refuses a missing file", DTDAQLearning.new().load("user://no_such_agent.json"), false)
-	# a file an agent could read from end to end, wrong on the "model" field alone:
-	# the DTDAKNN file above is turned away by the guards on the structure
+	# a file an agent could read from end to end, wrong on the "model" field alone: the DTDAKNN file above is turned away by the guards on the structure
 	t.check_equal("DTDAQLearning refuses a file that only lies about its model name",
 		_load_written('{"model": "NotQLearning", "version": 2, "q_table": {"s": {"a": 1.0}}, "actions": {"a": "string"}}'), false)
 
-	# a model file lives in user://, where a player can edit it by hand.
-	# the answer must be exactly false, the one a guard returns: a script error inside
-	# _from_dict would leave _load with null, which "not" would happily accept
-	# version 2, deliberately: _from_dict checks the version before the structure, so a
-	# version 1 file would leave at the version guard and never reach the guard named here
+	# a model file lives in user://, where a player can edit it by hand. The answer must be exactly false, the one a guard returns: a script error inside _from_dict would leave _load with null, which "not" would happily accept
+	# version 2, deliberately: _from_dict checks the version before the structure, so a version 1 file would leave at the version guard and never reach the guard named here
 	t.check_equal("_load refuses a q table that is not a table",
 		_load_written('{"model": "DTDAQLearning", "version": 2, "q_table": [1, 2]}'), false)
 	t.check_equal("_load refuses a state that holds no action",

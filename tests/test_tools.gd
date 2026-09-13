@@ -1,6 +1,5 @@
 # MLTools helpers, metrics and DTDAScaler.
 
-# how many assertions this suite runs, checked by the runner
 const PLAN = 82
 
 func _run(t):
@@ -49,7 +48,6 @@ func _run(t):
 	t.check_near("_rmse", ml.rmse([12.0, 20.0, 30.0], truth), sqrt(4.0 / 3.0))
 	t.check_near("_mae", ml.mae([12.0, 18.0, 30.0], truth), 4.0 / 3.0)
 	t.check_near("_r2_score on a perfect fit", ml.r2_score(truth, truth), 1.0)
-	# answering the mean everywhere is the definition of R2 = 0
 	t.check_near("_r2_score of a constant model on the mean", ml.r2_score([20.0, 20.0, 20.0], truth), 0.0)
 	# no variance to explain, must not divide by zero
 	t.check_near("_r2_score on a constant target", ml.r2_score([1, 1, 1], [5, 5, 5]), 0.0)
@@ -76,9 +74,7 @@ func _run(t):
 	t.check_near_array("_inverse_transform restores the first row", restored[0], raw[0])
 	t.check_near_array("_inverse_transform restores the last row", restored[2], raw[2])
 
-	# a column of integers must not trigger an integer division. 40000 / 81000
-	# came out as 0 until the scaler forced its offset and scale to floats,
-	# and the float literals above were not enough to catch it
+	# a column of integers must not trigger an integer division: 40000 / 81000 came out as 0 until the scaler forced its offset and scale to floats, and the float literals above were not enough to catch it
 	var integers = [
 		[40000],
 		[80000],
@@ -101,13 +97,11 @@ func _run(t):
 	var flat = constant.fit_transform([[7.0], [7.0]])
 	t.check_near_array("a constant column stays finite", flat[0], [0.0])
 
-	# the scaling learned on the training set must apply as is to new data
 	var reused = DTDAScaler.new(DTDAScaler.MINMAX)
 	reused.fit(raw)
 	t.check_near_array("_transform reuses the learned scaling", reused.transform([[5.0, 500.0]])[0], [1.0, 1.0])
 
 	t.section("MLTools, numbers read out of a file")
-	# what a model reads out of user:// has to be usable, not merely present
 	t.check_equal("a list of numbers is a list of numbers",
 		ml._check_number_array([1, 2.5], "M", "weights"), true)
 	t.check_equal("a text is not a list", ml._check_number_array("nope", "M", "weights"), false)
@@ -136,8 +130,7 @@ func _run(t):
 		ml._check_number_array([1.0, inf_value], "M", "weights"), false)
 
 	t.section("MLTools, rows handed to a fit")
-	# what a caller passes to fit() arrives from its own arithmetic, so one unlucky
-	# division upstream is all it takes
+	# what a caller passes to fit() arrives from its own arithmetic, so one unlucky division upstream is all it takes
 	t.check_equal("a sound matrix is a sound matrix",
 		ml._check_matrix([[1.0, 2.0], [3, 4]], "M"), true)
 	t.check_equal("a matrix that is not a list", ml._check_matrix("nope", "M"), false)
@@ -156,16 +149,12 @@ func _run(t):
 	t.check_equal("fewer labels than rows", ml._check_labels([[1.0], [2.0]], [7], "M"), false)
 
 	t.section("DTDAScaler, reading a saved scaler")
-	# a scaler is written inside the file of the model that owns it, and that file
-	# lives in user:// where it can be edited by hand. What is read back has to be
-	# usable, not merely present: transform() reads an offset and a scale per column
-	# and divides by the scale
+	# a scaler is written inside the file of the model that owns it, and that file lives in user:// where it can be edited by hand. What is read back has to be usable, not merely present: transform() reads an offset and a scale per column and divides by the scale
 	var sound = DTDAScaler.new()
 	t.check_equal("a sound scaler is read back",
 		sound.from_dict({"mode": DTDAScaler.MINMAX, "offsets": [1.0], "scales": [2.0]}), true)
 	t.check_near_array("and scales with what it read", sound.transform([[5.0]])[0], [2.0])
-	# the same trap as the feature index of a tree: a mode read back from JSON is a
-	# float, and this one is compared against an enum
+	# the same trap as the feature index of a tree: a mode read back from JSON is a float, and this one is compared against an enum
 	var moded = DTDAScaler.new()
 	moded.from_dict({"mode": 1.0, "offsets": [1.0], "scales": [2.0]})
 	t.check_equal("the mode comes back as an integer", typeof(moded.mode), TYPE_INT)
@@ -181,8 +170,7 @@ func _run(t):
 		DTDAScaler.new().from_dict({"offsets": [1.0, 2.0], "scales": [1.0]}), false)
 	t.check_equal("an offset that is not a number",
 		DTDAScaler.new().from_dict({"offsets": [1.0, "nope"], "scales": [1.0, 2.0]}), false)
-	# "2.5" and not "nope": float("nope") is 0.0, so the guard on the zero below would
-	# answer for it and this assertion would not name the guard it claims
+	# "2.5" and not "nope": float("nope") is 0.0, so the guard on the zero below would answer for it and this assertion would not name the guard it claims
 	t.check_equal("a scale that is not a number",
 		DTDAScaler.new().from_dict({"offsets": [1.0, 2.0], "scales": [1.0, "2.5"]}), false)
 	# this one used to load and answer inf at the first prediction, without an error
