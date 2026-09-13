@@ -39,3 +39,36 @@ jobs:
 
       - name: Run the tests
         run: godot --headless --path . --script res://tests/run_tests.gd
+
+  proportions:
+    name: Proportions
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Godot 4.3
+        run: |
+          set -euo pipefail
+          BUILD="Godot_v4.3-stable_linux.x86_64"
+          URL="https://github.com/godotengine/godot/releases/download/4.3-stable/${BUILD}.zip"
+          echo "Downloading $URL"
+          curl -fsSL -o godot.zip "$URL"
+          unzip -q godot.zip
+          sudo mv "$BUILD" /usr/local/bin/godot
+          sudo chmod +x /usr/local/bin/godot
+          godot --headless --version
+
+      # the ruler reads the files as text and registers no class_name of its own,
+      # so a failed import cannot skew its counts - unlike in the tests job, where
+      # that same step is what makes the addon loadable. It runs here only so Godot
+      # starts on a warm project, and its exit code is deliberately ignored
+      - name: Import the project
+        continue-on-error: true
+        run: godot --headless --path . --import
+
+      # --path . is not decorative: without it Godot resolves a worktree under
+      # .claude/ and the counts come out wrong. The ruler exits 1 on a crossing,
+      # which is what fails this job
+      - name: Measure the proportions
+        run: godot --headless --path . --script res://tools/check_proportions.gd
