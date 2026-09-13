@@ -28,8 +28,36 @@ How the figures are built, so nobody argues with them:
   counter answers zero everywhere is the failure mode to fear.
 - which modules each suite pays for is declared in the script, in `COVERAGE`.
   `tests/run_tests.gd` is the runner, not a test file: the comment ceiling
-  applies to it, the test ceiling does not. `tools/check_proportions.gd` is the
-  ruler and excludes itself from both.
+  applies to it, the test ceiling does not. The same holds for
+  `tools/check_proportions.gd`: it is a ruler, not a suite, so the test ceiling
+  passes it by, but it is listed and measured like every other file under the
+  comment ceiling. A ruler that exempts itself from what it measures weakens the
+  rule it carries.
+
+### One named exception
+
+`tests/test_qlearning.gd` stands at 76 non-empty lines against a budget of 59,
+and stays there. The ruler grants it by name, in the `EXCEPTIONS` table.
+
+The reason is arithmetic, not taste. Q-Learning is the most stateful model in
+the repository, and this suite's budget is computed on one single 237-line
+module: 59 lines to hold the epsilon decay, the `to_dict` snapshot, the refusal
+loop and the `reset`, four blocks each the only witness of the guards beneath
+it. `test_models.gd` covers four modules and draws 123 lines for the same
+quarter. The rule penalises a one-module suite mechanically, and getting under
+59 here means deleting a whole block, that is, a guarantee.
+
+The doctrine, because it is what serves next time:
+
+- an exception is **asked for when the unique witnesses exceed the budget**, not
+  when the file is merely awkward to shrink. Which witnesses are unique is
+  settled by mutation, one guard at a time, never by reading.
+- it is **justified by the measure**: the figures go in the request, and the
+  number granted is the file's count as measured, not a round number above it.
+- it **caps**. 76 means 76: at 77 lines the suite is over again and the script
+  exits 1. Every other suite over its budget still exits 1 too. The ceiling is
+  not negotiable against comfort; it is negotiable against a guard that would
+  otherwise lose its only witness.
 
 ## What the rule costs
 

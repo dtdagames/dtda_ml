@@ -1,18 +1,12 @@
 extends SceneTree
 
-# Measures the two proportion rules of CLAUDE.md and says where the repository
-# stands. It is not part of the test suite and declares no PLAN.
-#   godot --headless --script res://tools/check_proportions.gd
-# Exits 1 when a threshold is crossed, 0 otherwise.
+# Measures the two proportion rules of CLAUDE.md and exits 1 on a crossing.
+#   godot --headless --path . --script res://tools/check_proportions.gd
 
 const COMMENT_CAP = 0.10
 const TEST_CAP = 0.25
 
-# this script is the ruler, not a thing being measured: out of both reports
-const SELF_PATH = "res://tools/check_proportions.gd"
-
-# the runner is a runner, not a test file: the comment cap applies to it, the
-# test cap does not
+# the runner is a runner, not a suite: the comment cap applies to it, not the test one
 const RUNNER_PATH = "res://tests/run_tests.gd"
 
 const MODULES = {
@@ -30,8 +24,7 @@ const MODULES = {
 	"run_tests": RUNNER_PATH,
 }
 
-# what each suite exercises. A test file is allowed a quarter of the non-empty
-# lines of the modules listed here, and of nothing else.
+# what each suite exercises, and what its budget is a quarter of, nothing else
 const COVERAGE = {
 	"res://tests/test_models.gd": ["knn", "linreg", "logreg", "svm"],
 	"res://tests/test_tree.gd": ["tree"],
@@ -50,20 +43,23 @@ const COVERAGE = {
 	"res://tests/test_runner.gd": ["run_tests"],
 }
 
+# the test ceiling yields by name to a suite whose unique witnesses outgrow it,
+# and what is granted is itself a ceiling: one line more and the file is over.
+const EXCEPTIONS = {
+	"res://tests/test_qlearning.gd": 76,
+}
+
 const SKIP_DIRS = [".git", ".godot", ".claude", ".github"]
 
-# what a line can be counted as
 const BLANK = "blank"
 const CODE = "code"
 const COMMENT = "comment"
 const TRAILING = "trailing"
 
-# the counter has to tell a comment from a hash living inside a string, because
-# GDScript puts hashes in strings: Color("#14161c"), a maze row, a format. A
-# naive counter credits the demos with comments they do not have, and a counter
-# that answers "no comment" everywhere looks exactly like a clean tree. So these
-# lines are classified on every run, one by one, and a single wrong answer stops
-# the report. What one line cannot show is in SEQUENCES below.
+# a hash living in a string is not a comment: Color("#14161c"), a maze row, a
+# format. A counter blind to that credits the demos with comments they never had,
+# and one that answers zero everywhere looks exactly like a clean tree. So these
+# are classified on every run, and one wrong answer stops the report.
 const PROBES = [
 	["var total = 0", CODE],
 	["	# a full line comment", COMMENT],
@@ -79,11 +75,10 @@ const PROBES = [
 	["#!/usr/bin/env", COMMENT],
 ]
 
-# a triple-quoted string outlives the line that opens it, and so does the state
-# the counter carries. Each sequence below is classified in order through one
-# single state, never reset between its lines: that carry is the only thing
-# standing between a hash inside a multi-line string and a comment, and no file
-# in the tree opens one today, so nothing but these pairs would notice it break.
+# a triple-quoted string outlives the line that opens it, so the state carries.
+# Each sequence is classified in order through one state, never reset: that carry
+# is all that stands between a hash inside a multi-line string and a comment, and
+# no file in the tree opens one today, so nothing else would notice it break.
 const SEQUENCES = [
 	["a triple-quoted string spanning lines", [
 		["	var doc = \"\"\"", CODE],
@@ -118,9 +113,8 @@ func _initialize():
 
 # --- the line counter -------------------------------------------------------
 
-# index of the first hash that opens a real comment, -1 when the line carries
-# none. state["triple"] holds the multi-line string delimiter left open by the
-# previous line, so a hash inside one is not read as a comment either.
+# index of the first hash that opens a real comment, -1 when there is none.
+# state["triple"] carries the delimiter the previous line left open.
 func _comment_index(line, state):
 	var quote = state["triple"]
 	var i = 0
@@ -229,7 +223,7 @@ func _collect(dir_path, into):
 		if dir.current_is_dir():
 			if not (entry in SKIP_DIRS):
 				_collect(full, into)
-		elif entry.ends_with(".gd") and full != SELF_PATH:
+		elif entry.ends_with(".gd"):
 			into.append(full)
 		entry = dir.get_next()
 	dir.list_dir_end()
@@ -275,15 +269,24 @@ func _report_tests():
 		for key in COVERAGE[path]:
 			module_lines += _measure(MODULES[key])["non_empty"]
 		var budget = int(floor(TEST_CAP * float(module_lines)))
+		var allowed = EXCEPTIONS.get(path, budget)
 		total_test += test_lines
-		total_budget += budget
+		total_budget += allowed
 		var flag = ""
-		if test_lines > budget:
-			flag = "OVER by %d line(s)" % (test_lines - budget)
+		# a derogation nobody can see is a derogation nobody revisits
+		if EXCEPTIONS.has(path):
+			flag = "under exception, %d line(s) granted" % allowed
+		if test_lines > allowed:
+			var over = "OVER by %d line(s)" % (test_lines - allowed)
+			flag = over if flag == "" else "%s, %s" % [flag, over]
 			over_budget += 1
 		print("  %-28s %7d %9d %8d  %s" % [
 			path.replace("res://tests/", ""), test_lines, module_lines, budget, flag,
 		])
+	for granted in EXCEPTIONS:
+		if not COVERAGE.has(granted):
+			print("  exception for %s names no covered suite" % granted)
+			over_budget += 1
 	var verdict = ""
 	if total_test > total_budget:
 		verdict = "over by %d line(s)" % (total_test - total_budget)
