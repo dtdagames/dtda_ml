@@ -17,6 +17,13 @@ godot --headless --script res://tools/check_proportions.gd
 It prints a line per file and exits 1 as soon as a ceiling is crossed.
 It is not part of the test suite and declares no `PLAN`.
 
+Read the budget before the first assertion, not after. Measuring last means
+rewriting, and picking under pressure what gets deleted, which is the decision
+that deserves the most care. On a module that does not exist yet the ruler has
+nothing to measure, so the order is: write the module, list it under its suite
+in `COVERAGE`, read the budget, then write the first assertion. What the tests
+see does not change, the budget still comes first.
+
 How the figures are built, so nobody argues with them:
 
 - "lines" means non-empty lines, on both sides of both ratios. Blank lines can
@@ -33,6 +40,12 @@ How the figures are built, so nobody argues with them:
   passes it by, but it is listed and measured like every other file under the
   comment ceiling. A ruler that exempts itself from what it measures weakens the
   rule it carries.
+- `COVERAGE` is self-declared, which makes it a lever: adding a module to a
+  suite's list widens that suite's budget without proving a thing. So a suite
+  lists the modules it **actually exercises**, and "exercises" is shown the way
+  everything else here is shown, by mutation: a mutation in that module must
+  bring down at least one assertion of that suite. A listed module no mutation
+  ties to the suite has no business in its list.
 
 ### One named exception
 
@@ -54,6 +67,12 @@ The doctrine, because it is what serves next time:
   settled by mutation, one guard at a time, never by reading.
 - it is **justified by the measure**: the figures go in the request, and the
   number granted is the file's count as measured, not a round number above it.
+- it is **not granted by the hand it would serve**. Whoever is hitting the
+  ceiling writes the request and does not touch `EXCEPTIONS`, or the ruler moves
+  instead of the wall. The request carries that measured count and what each
+  block over budget is the only witness of. The human who decides writes the
+  entry, in a lot of its own: neither the implementer nor an agent adds a line
+  to that table.
 - it **caps**. 76 means 76: at 77 lines the suite is over again and the script
   exits 1. Every other suite over its budget still exits 1 too. The ceiling is
   not negotiable against comfort; it is negotiable against a guard that would
@@ -71,6 +90,12 @@ code the test claims to protect, one guard at a time, and keep what fails. What
 nothing notices when you delete it is what leaves first. Comments follow the
 same test: a comment that repeats the line below it goes, a comment that records
 why a guard exists stays, because that one is the only copy of a reason.
+
+One hole stays open, and naming it beats a formula that would pretend to close
+it: a new suite's budget is a quarter of a module the same hand just wrote, so
+padding the module widens the budget. Two things make that bearable, neither of
+them a fix. The 10% comment ceiling applies to that module too, so the padding
+cannot be prose. And lines that earn nothing are what review is for.
 
 ## Two writing rules already in force
 
