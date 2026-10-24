@@ -15,17 +15,21 @@ There are two things people actually do with it.
 
 **Train elsewhere, ship the weights, predict at runtime.** Fit a model wherever it is convenient, save it to JSON, and load it in the game. This is the sensible route for the models that learn by gradient descent: fitting a regression inside your game is rarely what you want, loading one that is already trained is.
 
-- var aim = DTDALinReg.new(0.01, 1000)
-- if aim.load("res://weights/aim.json"):
-- print(aim.predict([[distance, speed]]))
+```gdscript
+var aim = DTDALinReg.new(0.01, 1000)
+if aim.load("res://weights/aim.json"):
+	print(aim.predict([[distance, speed]]))
+```
 
 **Learn while the game runs.** DTDAQLearning is the one model that has to live in the engine, because an agent that learns by playing cannot be trained anywhere else. It takes one transition at a time, a few microseconds each, so it costs nothing per frame.
 
-- var move = agent.choose_action(state, ["left", "right"])
-- #play the move, then tell the agent how it went
-- agent.learn(state, move, reward, next_state, ["left", "right"], done)
-- #and when the episode ends, so it explores a little less from now on
-- agent.decay_exploration()
+```gdscript
+var move = agent.choose_action(state, ["left", "right"])
+#play the move, then tell the agent how it went
+agent.learn(state, move, reward, next_state, ["left", "right"], done)
+#and when the episode ends, so it explores a little less from now on
+agent.decay_exploration()
+```
 
 Training in the game is possible for the others too, without freezing a frame: see "Training a slice at a time".
 
@@ -53,7 +57,9 @@ The repository is also a small Godot project, so you can open it directly and pr
 Two demos live in demo/ and are worth a look before anything else, since they show what the models are for rather than what they return. Running the project opens the Q-Learning one, an agent learning to cross a field of lava; press F6 on demo/turret_demo.tscn for the other, a turret that learns to aim from its own shots. Each comes with a headless script that checks what it claims: demo/verify_maze.gd and demo/verify_turret.gd.
 
 The test suite lives in tests/ and needs no framework. Run it headless from the project root:
-- godot --headless --script res://tests/run_tests.gd
+```sh
+godot --headless --script res://tests/run_tests.gd
+```
 
 It prints one line per failure and ends with a count, exiting with 0 when everything passes. Some tests exercise the guards of the addon on purpose, so the output contains errors prefixed with the name of the model that raised them, "DTDAKMeans: ..." and the like: those are expected and are not failures.
 The same command runs on every push and pull request, against several Godot versions.
@@ -70,14 +76,16 @@ Use DTDATools.new() to create one. drop_variable() and get_variable() allows you
 This is usefull to create X_train and Y_train for all models
 
 Example:
-- data = [
-    [1, 1, 1, 0, 1],
-    [1, 1, 1, 1, 1],
-    [1, 0, 0, 0, 0]
-  ]
-- var ml = DTDATools.new()
-- var X_train = ml.drop_variable(data, data[0].size()-1) #return an array of array without the last column
-- var y_train = ml.get_variable(data, data[0].size()-1) #return an array of array only with the last column
+```gdscript
+data = [
+	[1, 1, 1, 0, 1],
+	[1, 1, 1, 1, 1],
+	[1, 0, 0, 0, 0]
+]
+var ml = DTDATools.new()
+var X_train = ml.drop_variable(data, data[0].size()-1) #return an array of array without the last column
+var y_train = ml.get_variable(data, data[0].size()-1) #return an array of array only with the last column
+```
 
 get_perf() scores a model: it compares the predictions to the expected labels and returns the percentage of correct answers, rounded to 0.01.
 It takes the type of the model as third argument, so it can align both arrays before comparing them:
@@ -87,9 +95,11 @@ It takes the type of the model as third argument, so it can align both arrays be
 - 3 : SVM, the 0 labels are converted to -1 to match what the model predicts
 
 Example:
-- var y_pred = knn.predict(X_test)
-- var y_test = [3, 6, 5]
-- print("KNN score: ", ml.get_perf(y_pred, y_test, 0), "%")
+```gdscript
+var y_pred = knn.predict(X_test)
+var y_test = [3, 6, 5]
+print("KNN score: ", ml.get_perf(y_pred, y_test, 0), "%")
+```
 
 === Metrics ===
 
@@ -108,10 +118,12 @@ For regression, use these rather than get_perf(), which binarizes at 0.5 and onl
 - r2_score(y_pred, y_test) : share of the variance explained, 1.0 is a perfect fit and a model worse than always answering the mean scores below 0
 
 Example:
-- var y_pred = logreg.predict(X_test)
-- print("F1: ", ml.f1_score(y_pred, y_test))
-- print("Confusion: ", ml.confusion_matrix(y_pred, y_test))
-- print("R2: ", ml.r2_score(linreg.predict(X_test), y_test))
+```gdscript
+var y_pred = logreg.predict(X_test)
+print("F1: ", ml.f1_score(y_pred, y_test))
+print("Confusion: ", ml.confusion_matrix(y_pred, y_test))
+print("R2: ", ml.r2_score(linreg.predict(X_test), y_test))
+```
 
 === Scaler ===
 
@@ -123,10 +135,12 @@ fit() learns the scaling, transform() applies it, fit_transform() does both, and
 Fit the scaler on your training set only, then apply that same scaler to the test set: refitting on the test set would scale it differently and quietly ruin your predictions.
 
 Example:
-- var scaler = DTDAScaler.new()
-- var X_train_scaled = scaler.fit_transform(X_train)
-- var X_test_scaled = scaler.transform(X_test) #the scaling learned on X_train
-- print("Back to the original unit: ", scaler.inverse_transform(X_train_scaled))
+```gdscript
+var scaler = DTDAScaler.new()
+var X_train_scaled = scaler.fit_transform(X_train)
+var X_test_scaled = scaler.transform(X_test) #the scaling learned on X_train
+print("Back to the original unit: ", scaler.inverse_transform(X_train_scaled))
+```
 
 === What a fit accepts ===
 
@@ -141,8 +155,10 @@ What the labels hold is left alone where the model only counts them or hands the
 A fit that is refused changes nothing: a model that was working goes on working, with the weights it already had. That holds for the seven models that have a fit(); DTDAQLearning learns one transition at a time instead, and learn() holds the same promise, answering null and leaving the cell as it was when the reward is not a real number. It is the same promise as the one on load(), for the same reason, and it is the one that matters more, since no file has to be edited for a caller to hand over a nan.
 
 Example:
-- if not model.fit(X_train, y_train):
-- print("the training data was not usable, the model is untouched")
+```gdscript
+if not model.fit(X_train, y_train):
+	print("the training data was not usable, the model is untouched")
+```
 
 === Training a slice at a time ===
 
@@ -150,10 +166,12 @@ fit() runs to the end before it returns. On two hundred rows of eight columns, a
 
 The same training can be taken a slice at a time instead, one call per frame:
 
-- if forest.fit_begin(X, y):
-- while forest.is_fitting():
-- var done: float = forest.fit_step()   #0.0 to 1.0, a progress bar if you want one
-- await get_tree().process_frame
+```gdscript
+if forest.fit_begin(X, y):
+	while forest.is_fitting():
+		var done: float = forest.fit_step()   #0.0 to 1.0, a progress bar if you want one
+		await get_tree().process_frame
+```
 
 fit() is that loop and nothing else, so a model trained in one go is the same model, to the last bit, as one stepped by hand. Existing code that calls fit() is unaffected.
 
@@ -173,32 +191,34 @@ The second is the nature of the data, and it moves the last two only. A round of
 
 Whether any of them fits inside a frame is a question about your machine, not about this table: on the one these were taken on the three descents came in under a frame and the other two did not, and on a machine two or three times slower none of the five did. **What holds is the ordering.** If a slice has to fit in a frame, the descents are the ones that might and the forest the last one that will. **And none of this scales indefinitely, so it is worth knowing where it stops.** On a thousand rows of twelve columns the descents run into the tens of milliseconds a slice, at or past a frame, and the two that depend on the data go far beyond. The forest cannot be cut finer than one tree without DTDATree itself becoming resumable, which it is not.
 
-DTDAKNN and DTDATree train in one go and have no fit_begin(). They are the two that need it least: fitting a KNN on a thousand rows is single-digit milliseconds, since it only keeps them.
+DTDAKNN and DTDATree train in one go: they have a fit_begin(), but it only reports an error and answers false, so they are trained with fit(). They are the two that need it least: fitting a KNN on a thousand rows is single-digit milliseconds, since it only keeps them.
 
 A training that never finishes changes nothing. Nothing is written into the model until the last slice, so a training that is abandoned, or stopped with fit_cancel(), or refused by fit_begin() because the rows are not usable, leaves the model it was going to replace exactly as it was. Either the old one whole or the new one whole, never a half of each. It is the promise that governs a refused file and a refused fit, applied to time.
 
-is_fitting(), fit_step() and fit_cancel() are safe to call on any model: one that trains in one go reports an error and answers that there is nothing left to do, rather than looping for ever.
+fit_begin(), is_fitting(), fit_step() and fit_cancel() are safe to call on any model. On one that trains in one go, fit_begin() reports an error and answers false, and fit_step() reports an error and answers that there is nothing left to do, rather than looping for ever.
 
 === Saving and loading a model ===
 
 Every model can be written to a JSON file and read back, so you can train once and ship the weights with your game instead of retraining at every launch.
 save(path) returns true on success, load(path) fills a model you just created. Both report a clear error and return false on failure, and load() refuses a file holding a different kind of model.
 
-A file lives in user://, where a player can edit it, so load() checks what it reads before believing it. What is checked is what a prediction computes with: the weights and the intercept of a regression or an SVM, the neighbour count and the training rows of a KNN, the offsets and scales of a scaler, the list of trees of a forest, the centres and the inertia of a K-Means, the q values of an agent. A text where a number belongs, an infinity where a number to compute with belongs, a list that is empty or shorter than the one it goes with, a scale of zero that every prediction would divide by, a neighbour count below one: each of those answers false with an error. The infinity is not hypothetical here: a weight written 1e400 in the file is more than a float can hold and comes back from JSON as an infinity. A literal nan or inf, which is what save() writes if a model ever holds one, makes the whole file unreadable and is turned away a step earlier.
+A file lives in user://, where a player can edit it, so load() checks what it reads before believing it. What is checked is what a prediction computes with: the weights and the intercept of a regression or an SVM, the neighbour count and the training rows of a KNN, the offsets and scales of a scaler, the list of trees and the mode of a forest, the centres and the inertia of a K-Means, the q values of an agent. A text where a number belongs, an infinity where a number to compute with belongs, a list that is empty or shorter than the one it goes with, a scale of zero that every prediction would divide by, a neighbour count below one, a forest mode that is not one of its two numbers, and, though only fit() reads them, a growth limit of a forest that is not a number: each of those answers false with an error. The infinity is not hypothetical here: a weight written 1e400 in the file is more than a float can hold and comes back from JSON as an infinity. A literal nan or inf, which is what save() writes if a model ever holds one, makes the whole file unreadable and is turned away a step earlier.
 
-What is not checked, and it is worth knowing: the inside of a decision tree. load() makes sure the root is a node, then takes the branches as they come, so a tree whose nodes have been rewritten by hand can load and answer nonsense without complaining. Neither is the mode of a forest, which every prediction reads to decide between a vote and a mean: a text there is read as a vote, so a regression forest can come back answering like a classifier, and it does so in silence. Neither are the settings only fit() reads, such as the learning rate or the number of rounds: a wrong one there costs nothing until you train again.
+What is not checked, and it is worth knowing: the inside of a decision tree. load() makes sure the root is a node, then takes the branches as they come, so a tree whose nodes have been rewritten by hand can load and answer nonsense without complaining. Neither are the settings only fit() reads, such as the learning rate or the number of rounds: a wrong one there costs nothing until you train again.
 
 A file that is refused changes nothing, in any of the eight models: one that was working goes on working, with the weights and the settings it already had.
 
 Use a user:// path: res:// is read only once the game is exported.
 
 Example:
-- var linreg = DTDALinReg.new(0.01, 1000)
-- linreg.fit(X_train, y_train)
-- linreg.save("user://linreg.json")
-- var loaded = DTDALinReg.new(0.01, 1000) #a brand new model, never fitted
-- if loaded.load("user://linreg.json"):
--  print("Prediction: ", loaded.predict(X_test)) #same results as the saved model
+```gdscript
+var linreg = DTDALinReg.new(0.01, 1000)
+linreg.fit(X_train, y_train)
+linreg.save("user://linreg.json")
+var loaded = DTDALinReg.new(0.01, 1000) #a brand new model, never fitted
+if loaded.load("user://linreg.json"):
+	print("Prediction: ", loaded.predict(X_test)) #same results as the saved model
+```
 
 === KNN Model ===
 
@@ -206,12 +226,14 @@ Use DTDAKNN.new() to create a new model. fit() and predict() allows you to train
 The prediction is the most frequent label among the k nearest neighbors. When two labels are tied, the one carried by the closest neighbor wins.
 
 Example:
-- var knn = DTDAKNN.new(3)
-- knn.fit(X_train, y_train)
-- var X_test = [
-    [1, 1, 0, 1]
-  ]
-- print("KNN prediction: ", knn.predict(X_test))
+```gdscript
+var knn = DTDAKNN.new(3)
+knn.fit(X_train, y_train)
+var X_test = [
+	[1, 1, 0, 1]
+]
+print("KNN prediction: ", knn.predict(X_test))
+```
 
 === Linear Regression Model ===
 
@@ -219,12 +241,14 @@ Use DTDALinReg.new() to create a new model. fit() and predict() allows you to tr
 Features and target are standardized internally by fit(), so the gradient descent stays stable whatever the scale of your data. You don't have to normalize anything beforehand: predict() gives its results back in the unit of the training target.
 
 Example:
-- var linreg = DTDALinReg.new(0.01, 1000)
-- linreg.fit(X_train, y_train)
-- var X_test = [
-    [1, 1, 0, 1]
-  ]
-- print("Linear Regression prediction: ", linreg.predict(X_test))
+```gdscript
+var linreg = DTDALinReg.new(0.01, 1000)
+linreg.fit(X_train, y_train)
+var X_test = [
+	[1, 1, 0, 1]
+]
+print("Linear Regression prediction: ", linreg.predict(X_test))
+```
 
 === Logistic Regression Model ===
 
@@ -232,12 +256,14 @@ Use DTDALogReg.new() to create a new model. fit() and predict() allows you to tr
 Like Linear Regression, the features are standardized internally by fit(), so you don't have to scale them yourself.
 
 Example:
-- var logreg = DTDALogReg.new(0.01, 1000)
-- logreg.fit(X_train, y_train)
-- var X_test = [
-    [1, 1, 0, 1]
-  ]
-- print("Logistic Regression prediction: ", logreg.predict(X_test))
+```gdscript
+var logreg = DTDALogReg.new(0.01, 1000)
+logreg.fit(X_train, y_train)
+var X_test = [
+	[1, 1, 0, 1]
+]
+print("Logistic Regression prediction: ", logreg.predict(X_test))
+```
 
 === SVM Model ===
 
@@ -245,12 +271,14 @@ Use DTDASVM.new() to create a new model. fit() and predict() allows you to train
 The features are standardized internally by fit() as well. A point sitting exactly on the decision boundary is predicted as 1.
 
 Example:
-- var svm = DTDASVM.new(0.01, 0.01, 1000)
-- svm.fit(X_train, y_train)
-- var X_test = [
-    [1, 1, 0, 1]
-  ]
-- print("SVM prediction: ", svm.predict(X_test))
+```gdscript
+var svm = DTDASVM.new(0.01, 0.01, 1000)
+svm.fit(X_train, y_train)
+var X_test = [
+	[1, 1, 0, 1]
+]
+print("SVM prediction: ", svm.predict(X_test))
+```
 
 === Decision Tree Model ===
 
@@ -266,14 +294,16 @@ A tree compares each feature to a threshold, so the scale of your data does not 
 Being made of thresholds, it also answers a constant outside the range it was trained on, where a linear regression keeps extrapolating.
 
 Example:
-- var tree = DTDATree.new(3, 2, DTDATree.CLASSIFIER)
-- tree.fit(X_train, y_train)
-- var X_test = [
-    [1, 1, 0, 1]
-  ]
-- print("Tree prediction: ", tree.predict(X_test))
-- var regressor = DTDATree.new(3, 2, DTDATree.REGRESSOR) #same model, on a continuous target
-- regressor.fit(X_train, y_train)
+```gdscript
+var tree = DTDATree.new(3, 2, DTDATree.CLASSIFIER)
+tree.fit(X_train, y_train)
+var X_test = [
+	[1, 1, 0, 1]
+]
+print("Tree prediction: ", tree.predict(X_test))
+var regressor = DTDATree.new(3, 2, DTDATree.REGRESSOR) #same model, on a continuous target
+regressor.fit(X_train, y_train)
+```
 
 === Random Forest Model ===
 
@@ -295,12 +325,14 @@ There is a draw at every step, so set_seed(value) is what makes a run repeatable
 Like a lone tree, a forest compares features to thresholds and needs no scaling.
 
 Example:
-- var forest = DTDAForest.new(25, 8, 2, DTDAForest.CLASSIFIER)
-- forest.set_seed(1)
-- forest.fit(X_train, y_train)
-- print("Forest prediction: ", forest.predict(X_test))
-- print("Accuracy: ", ml.accuracy(forest.predict(X_test), y_test), "%")
-- forest.save("user://forest.json")
+```gdscript
+var forest = DTDAForest.new(25, 8, 2, DTDAForest.CLASSIFIER)
+forest.set_seed(1)
+forest.fit(X_train, y_train)
+print("Forest prediction: ", forest.predict(X_test))
+print("Accuracy: ", ml.accuracy(forest.predict(X_test), y_test), "%")
+forest.save("user://forest.json")
+```
 
 A word on what to expect: on a small test set, a single forest can land level with a single tree by luck, one row being worth a couple of points. The gain is real but it is an average. The examples scene and the test suite both measure it over five seeds rather than one, and so should you.
 
@@ -328,16 +360,18 @@ Where the centres start decides where they end, and a poor start stays poor: it 
 Inertia falls as k rises whatever the grouping is worth, right down to zero when k reaches the number of rows. It cannot be read as a score on its own: it is read across several k on the same data, for where it stops falling sharply.
 
 Example:
-- var kmeans = DTDAKMeans.new(3)
-- kmeans.set_seed(1)
-- print("Groups: ", kmeans.fit_predict(positions))
-- print("Centres: ", kmeans.get_centroids())
-- for k in range(1, 6): #where does it stop falling
--  var trial = DTDAKMeans.new(k)
--  trial.set_seed(1)
--  trial.fit(positions)
--  print(k, " groups, inertia ", trial.inertia)
-- kmeans.save("user://camps.json")
+```gdscript
+var kmeans = DTDAKMeans.new(3)
+kmeans.set_seed(1)
+print("Groups: ", kmeans.fit_predict(positions))
+print("Centres: ", kmeans.get_centroids())
+for k in range(1, 6): #where does it stop falling
+	var trial = DTDAKMeans.new(k)
+	trial.set_seed(1)
+	trial.fit(positions)
+	print(k, " groups, inertia ", trial.inertia)
+kmeans.save("user://camps.json")
+```
 
 === Q-Learning Model ===
 
@@ -373,14 +407,17 @@ What keying by str() costs, in exchange:
 A saved agent carries the version of the format it was written in, and load() refuses anything else rather than reading it wrong.
 
 Example:
-- var agent = DTDAQLearning.new(0.2, 0.9, 1.0, 0.999, 0.1)
-- for episode in 1000:
--  var state = start_state
--  while not done:
--   var action = agent.choose_action(state, ["left", "right"])
--   #play the action, get the reward and the next state from your game
--   agent.learn(state, action, reward, next_state, ["left", "right"], done)
--   state = next_state
--  agent.decay_exploration() #once per episode, not once per step
-- agent.save("user://agent.json")
-- print("Best move: ", agent.predict(state)) #no exploration left, the learned policy
+```gdscript
+var agent = DTDAQLearning.new(0.2, 0.9, 1.0, 0.999, 0.1)
+for episode in 1000:
+	var state = start_state
+	var done = false
+	while not done:
+		var action = agent.choose_action(state, ["left", "right"])
+		#play the action, get the reward and the next state from your game
+		agent.learn(state, action, reward, next_state, ["left", "right"], done)
+		state = next_state
+	agent.decay_exploration() #once per episode, not once per step
+agent.save("user://agent.json")
+print("Best move: ", agent.predict(start_state)) #no exploration left, the learned policy
+```

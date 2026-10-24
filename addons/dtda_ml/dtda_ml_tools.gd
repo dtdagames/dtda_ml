@@ -27,6 +27,10 @@ func fit_step() -> float:
 	_fit_work = null
 	return 1.0
 
+func fit_begin(_newX, _newY) -> bool:
+	push_error("%s: this model trains in one go, it has no fit_begin()" % _model_name())
+	return false
+
 func _model_name() -> String:
 	return "DTDATools"
 

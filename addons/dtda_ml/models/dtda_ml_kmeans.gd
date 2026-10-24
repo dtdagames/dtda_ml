@@ -138,7 +138,7 @@ func _total_inertia(rows, centres) -> float:
 		total += _nearest(row, centres)[1]
 	return total
 
-func fit_begin(newX) -> bool:
+func fit_begin(newX, _newY = null) -> bool:
 	# the rows are weighed before a single field is written: a fit that took them as they came would leave a working model holding a nan, or half rewritten by a raise in the middle
 	if not _check_matrix(newX, "DTDAKMeans"):
 		return false
