@@ -1,7 +1,7 @@
 # Training a slice at a time. fit() runs to the end before it returns, which on a forest is seconds: a frozen frame. The same training can be taken a slice per frame instead. fit() is that loop and nothing else, so everything the other suites assert about fit() is already asserting about the stepping underneath; what is left to pin is here.
 
 # how many assertions this suite runs, checked by the runner
-const PLAN = 29
+const PLAN = 30
 
 const X = [[1.0, 2.0], [2.0, 1.0], [8.0, 9.0], [9.0, 8.0], [3.0, 3.0], [7.0, 7.0]]
 const Y = [0, 0, 1, 1, 0, 1]
@@ -104,3 +104,5 @@ func _run(t):
 	t.check_near("nor has a lone tree", DTDATree.new(3, 2, DTDATree.CLASSIFIER).fit_step(), 1.0, 0.0)
 	t.check_equal("and neither is left thinking it is training",
 		DTDAKNN.new(1).is_fitting(), false)
+	t.check_equal("fit_begin() is refused rather than missing, on a KNN, a lone tree and an agent",
+		[DTDAKNN.new(1).fit_begin([[1.0]], [0]), DTDATree.new().fit_begin([[1.0]], [0]), DTDAQLearning.new().fit_begin([[1.0]], [0])], [false, false, false])

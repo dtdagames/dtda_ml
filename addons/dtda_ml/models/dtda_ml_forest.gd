@@ -162,6 +162,10 @@ func from_dict(data) -> bool:
 	if version != FORMAT_VERSION:
 		push_error("DTDAForest: this file is written in format %d, this model reads format %d" % [version, FORMAT_VERSION])
 		return false
+	var saved_mode = data.get("mode", mode)
+	if (typeof(saved_mode) != TYPE_INT and typeof(saved_mode) != TYPE_FLOAT) or (saved_mode != CLASSIFIER and saved_mode != REGRESSOR):
+		push_error("DTDAForest: the saved mode is neither of the two modes, %s" % str(saved_mode))
+		return false
 	var saved = data.get("trees")
 	# absent and malformed answer the same way: a null is not a list either
 	if typeof(saved) != TYPE_ARRAY:
@@ -181,11 +185,16 @@ func from_dict(data) -> bool:
 			push_error("DTDAForest: one of the saved trees could not be read")
 			return false
 		rebuilt.push_back(tree)
-	mode = int(data.get("mode", mode))
-	num_trees = int(data.get("num_trees", rebuilt.size()))
-	max_depth = int(data.get("max_depth", max_depth))
-	min_samples_split = int(data.get("min_samples_split", min_samples_split))
-	max_features = int(data.get("max_features", max_features))
+	var limits = [data.get("num_trees", rebuilt.size()), data.get("max_depth", max_depth), data.get("min_samples_split", min_samples_split), data.get("max_features", max_features)]
+	for limit in limits:
+		if typeof(limit) != TYPE_INT and typeof(limit) != TYPE_FLOAT:
+			push_error("DTDAForest: one of the saved growth limits is not a number, %s" % str(limit))
+			return false
+	mode = int(saved_mode)
+	num_trees = int(limits[0])
+	max_depth = int(limits[1])
+	min_samples_split = int(limits[2])
+	max_features = int(limits[3])
 	trees = rebuilt
 	return true
 
