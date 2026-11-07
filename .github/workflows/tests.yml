@@ -72,3 +72,22 @@ jobs:
       # which is what fails this job
       - name: Measure the proportions
         run: godot --headless --path . --script res://tools/check_proportions.gd
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # pinned: a new gdtoolkit release must not turn this job red on code nobody touched
+      - name: Install gdtoolkit
+        run: pip install "gdtoolkit==4.5.0"
+
+      # gdlint reads gdlintrc from the repository root; it exits 1 on any problem
+      - name: Lint
+        run: gdlint addons tests demo tools
