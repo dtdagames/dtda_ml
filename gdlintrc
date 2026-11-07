@@ -1,0 +1,26 @@
+# gdtoolkit 4.5.0. Only the entries the current code violates are changed; every
+# other rule runs on its defaults. The counts are what each entry absorbs today.
+disable:
+# 16: extends written before class_name in 12 files, 4 consts after functions in the examples
+- class-definitions-order
+# 8: examples (5), tools (2), svm (1)
+- trailing-whitespace
+# 1: tests/test_names.gd:11, an override that keeps the parent's signature on purpose
+- unused-argument
+# 352 lines over 100; the longest is tests/test_forest.gd:49
+max-line-length: 1042
+# 5 functions over 6; the worst, forest/kmeans from_dict and run_tests _same, have 9
+max-returns: 9
+# 1: dtda_ml_tools.gd has 21
+max-public-methods: 21
+# the four rules below differ from the defaults only by accepting capitals (X, newX, dotXW...)
+# 88
+function-argument-name: _?[a-zA-Z][a-zA-Z0-9]*(_[a-zA-Z0-9]+)*
+# 81
+function-variable-name: '[a-zA-Z][a-zA-Z0-9]*(_[a-zA-Z0-9]+)*'
+# 15
+class-variable-name: _?[a-zA-Z][a-zA-Z0-9]*(_[a-zA-Z0-9]+)*
+# 1
+loop-variable-name: _?[a-zA-Z][a-zA-Z0-9]*(_[a-zA-Z0-9]+)*
+# 3: default plus _getVariable/_dropVariable (compatibility wrappers) and _exp_array_ (internal)
+function-name: (_on_([A-Z][a-z0-9]*)+(_[a-z0-9]+)*|_?[a-z][a-z0-9]*(_[a-z0-9]+)*|_getVariable|_dropVariable|_exp_array_)
